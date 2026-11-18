@@ -13,7 +13,7 @@ export function LogoMark({ size = 28, className = "" }: { size?: number; classNa
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className} aria-hidden="true">
       <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={gid} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="24">
           <stop offset="0%" stopColor="#3B82F6" />
           <stop offset="100%" stopColor="#8B5CF6" />
         </linearGradient>

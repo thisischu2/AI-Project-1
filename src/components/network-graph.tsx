@@ -134,6 +134,15 @@ export function NetworkGraph({
       layout: { name: "preset", padding: 36 },
     });
 
+    // Keep names readable on a phone: when the map is zoomed out to fit a
+    // small screen, grow the label size so it stays about 12px on screen.
+    const keepLabelsReadable = () => {
+      const z = instance.zoom();
+      instance.style().selector("node").style("font-size", Math.min(24, Math.max(11, 12 / z))).update();
+    };
+    instance.on("zoom", keepLabelsReadable);
+    keepLabelsReadable();
+
     instance.on("tap", "node", (evt) => onSelectRef.current?.(evt.target.id()));
     instance.on("tap", (evt) => {
       if (evt.target === instance) onSelectRef.current?.(null);

@@ -92,7 +92,7 @@ export default function Dashboard() {
         ))}
       </motion.section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
         <motion.section {...fade(3)}>
           <SectionTitle
             action={
@@ -132,7 +132,7 @@ export default function Dashboard() {
         </motion.section>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <motion.section {...fade(5)}>
           <SectionTitle
             action={

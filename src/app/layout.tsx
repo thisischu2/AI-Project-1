@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
+import { RegisterServiceWorker } from "@/components/register-sw";
 import { NetworkProvider } from "@/lib/store";
 import "./globals.css";
 
@@ -9,10 +10,12 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "6IX DEGREES — Everyone is closer than you think",
-  description: "AI-powered personal relationship intelligence. Remember. Connect. Discover.",
+  description: "Remember the people you meet and see how your network connects. Remember. Connect. Discover.",
+  applicationName: "6IX DEGREES",
+  appleWebApp: { capable: true, title: "6IX", statusBarStyle: "black-translucent" },
 };
 
-export const viewport: Viewport = { themeColor: "#09090B" };
+export const viewport: Viewport = { themeColor: "#09090B", viewportFit: "cover" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
@@ -20,6 +23,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         <NetworkProvider>
           <AppShell>{children}</AppShell>
+          <RegisterServiceWorker />
         </NetworkProvider>
       </body>
     </html>

@@ -64,7 +64,7 @@ export default function MapPage() {
         subtitle={`${data.contacts.length + 1} people · ${data.connections.length} recorded connections`}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
         <Card className="relative overflow-hidden">
           <NetworkGraph
             contacts={visibleContacts}
@@ -154,14 +154,14 @@ export default function MapPage() {
                         ))}
                       </ol>
                       <p className="mt-3 text-xs text-silver">
-                        Every step is a connection you recorded. Computed with breadth-first search, not AI.
+                        Every step is a connection you recorded. Worked out step by step from your own records.
                       </p>
                       {pathHidden && <p className="mt-2 text-xs text-amber-300">Some people on this path are hidden by your filters.</p>}
                       <Link
                         href={`/ask?q=${encodeURIComponent(`How is ${from === ME ? "me" : nameOf(from)} connected to ${nameOf(to)}?`)}`}
                         className="mt-4 inline-block"
                       >
-                        <Button size="sm">✦ Have Ask 6ix explain it</Button>
+                        <Button size="sm">Explain this path in words</Button>
                       </Link>
                     </>
                   ) : (
@@ -196,7 +196,7 @@ export default function MapPage() {
                 </button>
               ))}
             </div>
-            <p className="mt-3 text-xs text-silver">Scroll to zoom, drag to pan, tap a person to select them.</p>
+            <p className="mt-3 text-xs text-silver">Pinch to zoom, drag to move around, and tap a person to see their options.</p>
           </Card>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge tone="violet">Path</Badge>

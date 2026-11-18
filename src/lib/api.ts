@@ -2,7 +2,7 @@
 
 import type { NetworkData } from "./types";
 
-/** Shape the browser sends to the AI routes. Only what the routes need. */
+/** The saved network in the shape the search, map and Discover helpers use. */
 export function toPayload(data: NetworkData) {
   return {
     profileName: data.profile.name,
@@ -28,17 +28,6 @@ export function toPayload(data: NetworkData) {
     connections: data.connections.map(({ id, sourceId, targetId, label }) => ({ id, sourceId, targetId, label })),
     interactions: data.interactions.map(({ id, contactId, kind, date, summary }) => ({ id, contactId, kind, date, summary })),
   };
-}
-
-export async function postJSON<T>(url: string, body: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error ?? `Request failed (${res.status})`);
-  return json as T;
 }
 
 export function todayISO() {

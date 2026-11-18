@@ -64,8 +64,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ))}
         </nav>
         <div className="mt-auto rounded-xl border border-white/5 bg-white/[0.02] p-3 text-xs leading-relaxed text-silver">
-          Your network is stored in this browser. Degrees of separation come from connections you record, never from
-          AI guesses.
+          Your network is saved on this device and works offline. Degrees of separation come only from connections you
+          record.
         </div>
       </aside>
 
@@ -89,12 +89,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             key={href}
             href={href}
+            aria-current={isActive(href) ? "page" : undefined}
             className={clsx(
-              "flex flex-col items-center gap-1 py-2.5 text-[10px]",
+              "flex min-h-14 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium",
               isActive(href) ? "text-platinum" : "text-zinc-500",
             )}
           >
-            <Icon size={19} className={isActive(href) ? "text-cobalt" : ""} />
+            <Icon size={21} className={isActive(href) ? "text-cobalt" : ""} />
             {label.replace("My ", "").replace("The ", "")}
           </Link>
         ))}

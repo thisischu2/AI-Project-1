@@ -21,7 +21,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       className={clsx(
         "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.98]",
-        size === "sm" ? "h-8 px-3 text-[13px]" : "h-10 px-4 text-sm",
+        size === "sm" ? "h-10 px-3 text-[13px] sm:h-8" : "h-11 px-4 text-sm sm:h-10",
         variant === "primary" &&
           "bg-gradient-to-b from-cobalt to-[#2563eb] text-white shadow-[0_8px_24px_-12px_rgba(59,130,246,0.8)] hover:brightness-110",
         variant === "secondary" && "border border-white/10 bg-white/[0.04] text-platinum hover:bg-white/[0.08]",
@@ -48,7 +48,7 @@ export function SectionTitle({ children, action }: { children: React.ReactNode; 
 }
 
 export const inputClass =
-  "w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-sm text-platinum placeholder:text-zinc-500 transition focus:border-cobalt/60 focus:bg-black/40 focus:outline-none focus:ring-2 focus:ring-cobalt/20";
+  "w-full rounded-xl border border-white/10 bg-black/30 px-3.5 py-2.5 text-base text-platinum sm:text-sm placeholder:text-zinc-500 transition focus:border-cobalt/60 focus:bg-black/40 focus:outline-none focus:ring-2 focus:ring-cobalt/20";
 
 export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input(
   { className, ...props },
@@ -101,14 +101,6 @@ export function DemoBadge() {
   return (
     <Badge tone="amber" className="shrink-0">
       Demo · fictional
-    </Badge>
-  );
-}
-
-export function AIBadge({ children = "AI suggestion" }: { children?: React.ReactNode }) {
-  return (
-    <Badge tone="violet" className="shrink-0">
-      ✦ {children}
     </Badge>
   );
 }

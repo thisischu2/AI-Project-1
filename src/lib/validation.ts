@@ -1,6 +1,6 @@
 /**
- * Input validation for everything the browser sends to the server.
- * Requests that don't match are rejected before any AI call is made.
+ * The shape of a saved network, used by search, Discover and their tests.
+ * Parsing fills in defaults (for example, empty lists) for older saved data.
  */
 import { z } from "zod";
 import { CATEGORIES, INTERACTION_KINDS } from "./types";
@@ -52,25 +52,3 @@ export const NetworkPayloadSchema = z.object({
 
 export type NetworkPayload = z.infer<typeof NetworkPayloadSchema>;
 export type PayloadContact = z.infer<typeof ContactSchema>;
-
-export const AskRequestSchema = z.object({
-  question: str(1000).min(1),
-  network: NetworkPayloadSchema,
-});
-
-export const ExtractRequestSchema = z.object({
-  note: str(6000).min(1),
-  today: str(10),
-  contactId: str(80).optional(),
-  network: NetworkPayloadSchema,
-});
-
-export const DiscoverRequestSchema = z.object({ network: NetworkPayloadSchema });
-
-export const DraftIntroRequestSchema = z.object({
-  aId: str(80),
-  bId: str(80),
-  reason: str(1000),
-  consentConfirmed: z.literal(true),
-  network: NetworkPayloadSchema,
-});

@@ -1,77 +1,35 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Compass, Copy, Sparkles, X } from "lucide-react";
-import { useState } from "react";
-import { AIBadge, Avatar, Badge, Button, Card, EmptyState, PageHeader, Sheet, Spinner, Textarea } from "@/components/ui";
-import { postJSON, toPayload } from "@/lib/api";
+import { Compass, Copy, PenLine, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Avatar, Badge, Button, Card, EmptyState, PageHeader, Sheet, Textarea } from "@/components/ui";
+import { toPayload } from "@/lib/api";
+import { draftIntroduction, suggestIntroductions, type Suggestion } from "@/lib/assistant";
 import { useNetwork } from "@/lib/store";
-
-interface Suggestion {
-  aId: string;
-  bId: string;
-  headline: string;
-  rationale: string;
-  confidence: "low" | "medium" | "high";
-  evidence: { kind: string; detail: string }[];
-}
-
-interface Draft {
-  subject: string;
-  body: string;
-  sharedDetails: string[];
-}
+import type { NetworkPayload } from "@/lib/validation";
 
 export default function DiscoverPage() {
   const { data, nameOf } = useNetwork();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
+  // Worked out on the phone from recorded interests, goals and skills.
+  const suggestions = useMemo(() => suggestIntroductions(toPayload(data) as NetworkPayload), [data]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [drafting, setDrafting] = useState<Suggestion | null>(null);
 
-  const run = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const r = await postJSON<{ suggestions: Suggestion[] }>("/api/ai/discover", { network: toPayload(data) });
-      setSuggestions(r.suggestions);
-      setDismissed(new Set());
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const visible = (suggestions ?? []).filter((s) => !dismissed.has(s.aId + s.bId));
+  const visible = suggestions.filter((s) => !dismissed.has(s.aId + s.bId));
 
   return (
     <>
       <PageHeader
         title="Discover"
         subtitle="Possible introductions between people you know, based only on what you've recorded."
-        action={
-          <Button variant="primary" onClick={run} disabled={loading || data.contacts.length < 2}>
-            {loading ? <Spinner /> : <Sparkles size={15} />} {suggestions ? "Refresh" : "Find possibilities"}
-          </Button>
-        }
       />
       <p className="-mt-4 mb-6 max-w-2xl text-xs text-silver">
         The app finds pairs who aren&apos;t connected yet and share recorded interests or have complementary goals and skills.
-        Claude explains each one. These are possibilities, not certainties, and nothing is shared without you.
+        Location alone never counts. These are possibilities, not certainties, and nothing is shared without you.
       </p>
-      {error && <p className="mb-4 text-sm text-red-300">{error}</p>}
 
-      {!suggestions ? (
-        <Card>
-          <EmptyState
-            icon={<Compass size={20} />}
-            title="Discover who might help whom"
-            body="Run a scan of your network. Location alone never counts as a reason to introduce people."
-          />
-        </Card>
-      ) : visible.length === 0 ? (
+      {visible.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Compass size={20} />}
@@ -80,7 +38,7 @@ export default function DiscoverPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <AnimatePresence>
             {visible.map((s, i) => (
               <motion.div key={s.aId + s.bId} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.05 } }} exit={{ opacity: 0, scale: 0.97 }}>
@@ -94,7 +52,7 @@ export default function DiscoverPage() {
                       <Badge tone={s.confidence === "high" ? "green" : s.confidence === "medium" ? "cobalt" : "neutral"}>
                         {s.confidence} support
                       </Badge>
-                      <AIBadge>Possibility</AIBadge>
+                      <Badge tone="violet">Possibility</Badge>
                     </div>
                   </div>
                   <p className="text-sm text-silver">
@@ -115,7 +73,7 @@ export default function DiscoverPage() {
                       <X size={13} /> Dismiss
                     </Button>
                     <Button size="sm" onClick={() => setDrafting(s)}>
-                      Draft introduction
+                      <PenLine size={13} /> Draft introduction
                     </Button>
                   </div>
                 </Card>
@@ -133,57 +91,45 @@ export default function DiscoverPage() {
 }
 
 function DraftPanel({ s }: { s: Suggestion }) {
-  const { data, nameOf } = useNetwork();
+  const { data, nameOf, contactById } = useNetwork();
   const [consent, setConsent] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [draft, setDraft] = useState<Draft | null>(null);
   const [body, setBody] = useState("");
+  const [shared, setShared] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
-  const generate = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const r = await postJSON<Draft>("/api/ai/draft-intro", {
-        aId: s.aId,
-        bId: s.bId,
-        reason: s.rationale,
-        consentConfirmed: true,
-        network: toPayload(data),
-      });
-      setDraft(r);
-      setBody(`Subject: ${r.subject}\n\n${r.body}`);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+  const generate = () => {
+    const payload = toPayload(data) as NetworkPayload;
+    const a = payload.contacts.find((c) => c.id === s.aId);
+    const b = payload.contacts.find((c) => c.id === s.bId);
+    if (!a || !b || !contactById(s.aId) || !contactById(s.bId)) return;
+    const d = draftIntroduction(a, b, s.evidence, data.profile.name);
+    setBody(`Subject: ${d.subject}\n\n${d.body}`);
+    setShared(d.sharedDetails);
+    setCopied(false);
   };
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-silver">
-        6IX never sends messages. Claude drafts a note you can edit, copy, and send yourself to {nameOf(s.aId)} and {nameOf(s.bId)}.
+        6IX never sends messages. It fills in a template you can edit, copy, and send yourself to {nameOf(s.aId)} and {nameOf(s.bId)}.
       </p>
       <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 text-sm">
-        <input type="checkbox" className="mt-0.5 accent-cobalt" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <input type="checkbox" className="mt-0.5 size-5 shrink-0 accent-cobalt" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
           I&apos;ll check with both people before sharing their details, and I approve drafting this introduction.
         </span>
       </label>
-      <Button variant="primary" disabled={!consent || loading} onClick={generate}>
-        {loading ? <Spinner /> : <Sparkles size={15} />} Draft it
+      <Button variant="primary" disabled={!consent} onClick={generate}>
+        <PenLine size={15} /> Draft it
       </Button>
-      {error && <p className="text-sm text-red-300">{error}</p>}
-      {draft && (
+      {body && (
         <>
           <Textarea aria-label="Draft" className="min-h-64" value={body} onChange={(e) => setBody(e.target.value)} />
-          {draft.sharedDetails.length > 0 && (
+          {shared.length > 0 && (
             <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-sm">
               <p className="mb-1 font-medium text-amber-200">This draft shares:</p>
               <ul className="list-disc pl-5 text-amber-100/80">
-                {draft.sharedDetails.map((d) => (
+                {shared.map((d) => (
                   <li key={d}>{d}</li>
                 ))}
               </ul>
