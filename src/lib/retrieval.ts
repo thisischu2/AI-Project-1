@@ -1,8 +1,7 @@
 /**
- * Deterministic retrieval: decide WHICH records Claude gets to see.
- *
- * Only relevant records are sent to the model, and facts such as paths and
- * shared attributes are computed here in code, not by the AI.
+ * Deterministic search over the user's own records: find the people a
+ * question is about, compute verified paths, and gather Discover evidence.
+ * Everything here is plain code; nothing is sent anywhere.
  */
 import { shortestPath, hasConnection } from "./graph";
 import type { NetworkPayload, PayloadContact } from "./validation";
@@ -64,30 +63,6 @@ export function contactSearchText(c: PayloadContact): string {
   ]
     .filter(Boolean)
     .join(" ");
-}
-
-export function formatContact(c: PayloadContact): string {
-  const line = (label: string, v?: string | string[]) =>
-    v && (Array.isArray(v) ? v.length : v.trim()) ? `  ${label}: ${Array.isArray(v) ? v.join(", ") : v}\n` : "";
-  return (
-    `<contact id="${c.id}">\n` +
-    line("name", c.name) +
-    line("location", c.location) +
-    line("occupation", c.occupation) +
-    line("organization", c.organization) +
-    line("categories", c.categories) +
-    line("tags", c.tags) +
-    line("interests", c.interests) +
-    line("goals", c.goals) +
-    line("skills", c.skills) +
-    line("how we met", c.metContext) +
-    line("notes", c.notes) +
-    line(
-      "important dates",
-      c.importantDates.map((d) => `${d.label} ${d.date}`),
-    ) +
-    `</contact>`
-  );
 }
 
 export interface PathFact {

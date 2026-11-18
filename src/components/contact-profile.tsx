@@ -109,7 +109,7 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
         ["Skills", contact.skills],
         ["Tags", contact.tags],
       ] as const).some(([, v]) => v.length) && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {([
             ["Interests", contact.interests],
             ["Goals", contact.goals],

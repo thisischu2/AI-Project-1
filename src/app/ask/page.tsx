@@ -4,23 +4,15 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, ArrowUp, Info } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { LogoMark } from "@/components/logo";
-import { AIBadge, Avatar, Button, Card, PageHeader, Spinner } from "@/components/ui";
-import { postJSON, toPayload } from "@/lib/api";
+import { Avatar, Badge, Button, Card, PageHeader } from "@/components/ui";
+import { toPayload } from "@/lib/api";
+import { answerQuestion, type Answer } from "@/lib/assistant";
 import { degreeLabel } from "@/lib/graph";
 import { useNetwork } from "@/lib/store";
 
-interface PathFact {
-  found: boolean;
-  names: string[];
-  degrees: number | null;
-}
-interface Answer {
-  answer: string;
-  referencedContactIds: string[];
-  gaps: string[];
-  paths: PathFact[];
-}
-type Turn = { q: string; a?: Answer; error?: string };
+import type { NetworkPayload } from "@/lib/validation";
+
+type Turn = { q: string; a: Answer };
 
 const EXAMPLES = [
   "Who do I know in New York?",
@@ -33,24 +25,15 @@ export default function AskPage() {
   const { data, nameOf } = useNetwork();
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [loading, setLoading] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
   const autoAsked = useRef(false);
 
-  const ask = async (question: string) => {
+  // Answers are computed on the phone from saved records. No AI, no network.
+  const ask = (question: string) => {
     const q = question.trim();
-    if (!q || loading) return;
+    if (!q) return;
     setInput("");
-    setTurns((t) => [...t, { q }]);
-    setLoading(true);
-    try {
-      const a = await postJSON<Answer>("/api/ai/ask", { question: q, network: toPayload(data) });
-      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, a } : x)));
-    } catch (e) {
-      setTurns((t) => t.map((x, i) => (i === t.length - 1 ? { ...x, error: (e as Error).message } : x)));
-    } finally {
-      setLoading(false);
-    }
+    setTurns((t) => [...t, { q, a: answerQuestion(q, toPayload(data) as NetworkPayload) }]);
   };
 
   // Support links like /ask?q=... from other pages.
@@ -60,18 +43,18 @@ export default function AskPage() {
     if (q) {
       autoAsked.current = true;
       window.history.replaceState(null, "", "/ask");
-      ask(q);
+      queueMicrotask(() => ask(q));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [turns, loading]);
+  }, [turns]);
 
   return (
     <>
-      <PageHeader title="Ask 6ix" subtitle="Ask about your own network. Answers come only from what you've recorded." />
+      <PageHeader title="Ask 6ix" subtitle="Ask about your own network. Answers come only from what you've recorded, worked out on your phone." />
 
       <div className="mx-auto max-w-3xl">
         {turns.length === 0 && (
@@ -83,7 +66,7 @@ export default function AskPage() {
                 <button
                   key={e}
                   onClick={() => ask(e)}
-                  className="surface rounded-xl px-4 py-3 text-left text-sm text-zinc-300 transition hover:border-white/15 hover:text-platinum"
+                  className="surface rounded-xl px-4 py-3.5 text-left text-sm text-zinc-300 transition hover:border-white/15 hover:text-platinum"
                 >
                   {e}
                 </button>
@@ -99,13 +82,12 @@ export default function AskPage() {
                 <div className="flex justify-end">
                   <p className="max-w-[85%] rounded-2xl rounded-br-md bg-cobalt/20 px-4 py-2.5 text-sm text-blue-50">{t.q}</p>
                 </div>
-                {t.error && <p className="text-sm text-red-300">{t.error}</p>}
-                {t.a && (
+                {(
                   <Card className="p-5">
                     <div className="mb-3 flex items-center gap-2">
                       <LogoMark size={18} />
                       <span className="text-sm font-medium">Ask 6ix</span>
-                      <AIBadge>AI answer</AIBadge>
+                      <Badge>From your records</Badge>
                     </div>
                     {t.a.paths.map((p, j) => (
                       <div key={j} className="mb-4 rounded-xl border border-violet/25 bg-violet/5 p-3">
@@ -145,11 +127,6 @@ export default function AskPage() {
               </motion.div>
             ))}
           </AnimatePresence>
-          {loading && (
-            <div className="flex items-center gap-3 text-sm text-silver">
-              <Spinner /> Looking through your network…
-            </div>
-          )}
           <div ref={bottom} />
         </div>
 
@@ -163,12 +140,13 @@ export default function AskPage() {
           <div className="surface flex items-center gap-2 rounded-2xl p-2 pl-4 backdrop-blur-xl">
             <input
               aria-label="Ask a question"
-              className="flex-1 bg-transparent text-sm placeholder:text-zinc-500 focus:outline-none"
+              enterKeyHint="send"
+              className="min-w-0 flex-1 bg-transparent text-base placeholder:text-zinc-500 focus:outline-none"
               placeholder="Ask about anyone in your network…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <Button type="submit" variant="primary" size="sm" disabled={!input.trim() || loading} aria-label="Send">
+            <Button type="submit" variant="primary" size="sm" disabled={!input.trim()} aria-label="Send">
               <ArrowUp size={15} />
             </Button>
           </div>
