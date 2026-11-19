@@ -63,7 +63,7 @@ interface Store {
   addConnection: (sourceId: string, targetId: string, label?: string) => boolean;
   deleteConnection: (id: string) => void;
   // interactions
-  addInteraction: (input: Omit<Interaction, "id" | "createdAt">) => void;
+  addInteraction: (input: Omit<Interaction, "id" | "createdAt">) => string;
   deleteInteraction: (id: string) => void;
   // reminders
   addReminder: (input: Omit<Reminder, "id" | "createdAt" | "done">) => void;
@@ -254,13 +254,18 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
       deleteConnection: (id) =>
         setData((prev) => ({ ...prev, connections: prev.connections.filter((c) => c.id !== id) })),
 
-      addInteraction: (input) =>
+      addInteraction: (input) => {
+        const id = newId("i");
+        setData((prev) => ({ ...prev, interactions: [...prev.interactions, { ...input, id, createdAt: today() }] }));
+        return id;
+      },
+      deleteInteraction: (id) =>
         setData((prev) => ({
           ...prev,
-          interactions: [...prev.interactions, { ...input, id: newId("i"), createdAt: today() }],
+          interactions: prev.interactions.filter((i) => i.id !== id),
+          // Follow-ups taken from this note stay, just without the link.
+          reminders: prev.reminders.map((r) => (r.sourceInteractionId === id ? { ...r, sourceInteractionId: undefined } : r)),
         })),
-      deleteInteraction: (id) =>
-        setData((prev) => ({ ...prev, interactions: prev.interactions.filter((i) => i.id !== id) })),
 
       addReminder: (input) =>
         setData((prev) => ({

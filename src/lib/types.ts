@@ -92,6 +92,8 @@ export interface Reminder {
   title: string;
   dueDate?: string; // YYYY-MM-DD
   done: boolean;
+  /** The note this follow-up was taken from, if any. */
+  sourceInteractionId?: string;
   createdAt: string;
 }
 

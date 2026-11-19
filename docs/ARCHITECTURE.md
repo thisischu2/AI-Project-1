@@ -33,6 +33,7 @@ No server code, no AI service, no secret keys.
 | `src/lib/persistence.ts` | Checks saved data on load (repairs, never silently discards), backup files, combining two networks |
 | `src/lib/duplicates.ts` | Duplicate rules (email, phone, names, nicknames) with reasons, and merging two contacts |
 | `src/lib/importers.ts` | CSV and vCard parsing, column matching, row classification and the import plan |
+| `src/lib/memory.ts` | Note search, promise and follow-up spotting from a note's wording (with due dates from "by Friday", "next week" and so on), and the per-person "At a glance" summary where every line names its source notes |
 | `src/app/data/page.tsx` | Backup & your data: save, load (combine or replace), recovered copy, delete all |
 | `src/app/manifest.ts`, `public/sw.js` | Home-screen install and offline support |
 | `src/lib/demo-data.ts` | Fictional demo network (every person flagged `isDemo`) |
