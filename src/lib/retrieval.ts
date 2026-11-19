@@ -157,6 +157,20 @@ function goalMatches(seeker: PayloadContact, helper: PayloadContact): Evidence[]
   return out;
 }
 
+/** What two people's records have in common. Location only counts alongside something else. */
+export function pairEvidence(a: PayloadContact, b: PayloadContact): Evidence[] {
+  const evidence: Evidence[] = [];
+  const bInterests = new Map(b.interests.map((x) => [norm(x), x]));
+  for (const x of a.interests) {
+    if (bInterests.has(norm(x))) evidence.push({ kind: "shared_interest", detail: `Both list "${x}" as an interest` });
+  }
+  evidence.push(...goalMatches(a, b), ...goalMatches(b, a));
+  // Location alone is too weak to suggest an introduction; it only supports other evidence.
+  if (evidence.length && a.location && b.location && norm(a.location) === norm(b.location))
+    evidence.push({ kind: "same_location", detail: `Both are recorded in ${a.location}` });
+  return evidence;
+}
+
 /**
  * Pairs of contacts who are NOT already connected and have at least one piece
  * of recorded, complementary evidence. Pure function: same input, same output.
@@ -169,16 +183,8 @@ export function discoverCandidates(network: NetworkPayload, limit = 8): Candidat
       const a = people[i];
       const b = people[j];
       if (hasConnection(network.connections, a.id, b.id)) continue;
-      const evidence: Evidence[] = [];
-      const bInterests = new Map(b.interests.map((x) => [norm(x), x]));
-      for (const x of a.interests) {
-        if (bInterests.has(norm(x))) evidence.push({ kind: "shared_interest", detail: `Both list "${x}" as an interest` });
-      }
-      evidence.push(...goalMatches(a, b), ...goalMatches(b, a));
-      const sameCity = a.location && b.location && norm(a.location) === norm(b.location);
-      // Location alone is too weak to suggest an introduction; it only supports other evidence.
+      const evidence = pairEvidence(a, b);
       if (evidence.length === 0) continue;
-      if (sameCity) evidence.push({ kind: "same_location", detail: `Both are recorded in ${a.location}` });
       const score = evidence.reduce((s, e) => s + (e.kind === "goal_match" ? 3 : e.kind === "shared_interest" ? 2 : 1), 0);
       out.push({ aId: a.id, bId: b.id, evidence, score });
     }

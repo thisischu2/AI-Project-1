@@ -2,7 +2,7 @@
 
 import { BellPlus, Briefcase, CalendarDays, Link2, MapPin, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatDate, todayISO } from "@/lib/api";
 import { distancesFrom } from "@/lib/graph";
 import { detectCommitments, searchNotes, summarizePerson, type Commitment } from "@/lib/memory";
@@ -12,7 +12,7 @@ import { ContactForm } from "./contact-form";
 import { Highlight, SearchBox } from "./note-search";
 import { Avatar, Badge, Button, DemoBadge, Input, SectionTitle, Textarea, inputClass } from "./ui";
 
-export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () => void }) {
+export function ContactProfile({ id, onDeleted, focusNoteId }: { id: string; onDeleted?: () => void; focusNoteId?: string }) {
   const store = useNetwork();
   const { data, contactById, nameOf } = store;
   const contact = contactById(id);
@@ -24,7 +24,12 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
   const [reminder, setReminder] = useState({ title: "", dueDate: "" });
   const [query, setQuery] = useState("");
   // Notes to highlight after tapping a summary line's source link.
-  const [focus, setFocus] = useState<string[]>([]);
+  const [focus, setFocus] = useState<string[]>(focusNoteId ? [focusNoteId] : []);
+  useEffect(() => {
+    if (!focusNoteId) return;
+    const t = setTimeout(() => document.getElementById(`note-${focusNoteId}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 350);
+    return () => clearTimeout(t);
+  }, [focusNoteId]);
   // Promises found in the note just logged here, offered one by one.
   const [offered, setOffered] = useState<{ noteId: string; items: Commitment[] } | null>(null);
 
