@@ -23,6 +23,7 @@
 - **Saves data between uses.** Your network is stored in the browser's local storage (`src/lib/store.tsx`).
 - **Works with no internet connection.** `public/sw.js` keeps a copy of every page; your data is already on the phone.
 - **Calculates results from your inputs.** Degrees of separation, reminder countdowns, and Discover matches.
+- **Backup and move between devices.** The Backup page (top-right on a phone) saves one file you can AirDrop, email or save to Drive, and loads it on another device: combine with what's there, or replace it. A new device can load a backup straight from the welcome screen.
 - **No AI service and no keys.** There is no server code and nothing to configure.
 
 ### Install it on your phone

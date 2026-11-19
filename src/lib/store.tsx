@@ -2,6 +2,7 @@
 
 /**
  * v1 storage layer: keeps the user's network in browser localStorage.
+ * Saved data is checked on load (src/lib/persistence.ts) and never silently replaced.
  *
  * Every read/write goes through this one provider, so replacing it with a
  * Supabase-backed implementation later only touches this file.
@@ -9,9 +10,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { buildDemoNetwork, emptyNetwork } from "./demo-data";
 import { hasConnection } from "./graph";
+import { mergeNetworks, parseSaved, type MergeSummary } from "./persistence";
 import type { Connection, Contact, Interaction, NetworkData, Reminder } from "./types";
 
 const STORAGE_KEY = "6ix-degrees:network:v1";
+/** Where unreadable or partly unreadable saved data is kept, so it is never lost. */
+export const RECOVERY_KEY = "6ix-degrees:recovery";
+
+/** Something the person should know about their saved data. */
+export type StorageNotice =
+  | { kind: "recovered"; message: string } // a copy of unreadable data was kept
+  | { kind: "save-failed"; message: string }; // the browser refused to save (usually storage full)
 
 export function newId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -24,6 +33,14 @@ type ContactInput = Omit<Contact, "id" | "createdAt" | "updatedAt">;
 interface Store {
   data: NetworkData;
   ready: boolean;
+  notice: StorageNotice | null;
+  dismissNotice: () => void;
+  /** The raw text kept aside after a load problem, if any. */
+  recoveryCopy: () => string | null;
+  // backup
+  replaceAll: (data: NetworkData) => void;
+  mergeIn: (data: NetworkData) => MergeSummary;
+  deleteAllData: () => void;
   contactById: (id: string) => Contact | undefined;
   nameOf: (id: string) => string;
   // onboarding
@@ -52,26 +69,72 @@ const StoreContext = createContext<Store | null>(null);
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<NetworkData>(() => emptyNetwork());
   const [ready, setReady] = useState(false);
+  const [notice, setNotice] = useState<StorageNotice | null>(null);
+  // Writes are blocked if a damaged original couldn't be copied aside first.
+  const [blocked, setBlocked] = useState(false);
 
   // Load once on the client (localStorage does not exist on the server).
+  // Saved data is checked first. Anything that can't be read is copied to
+  // RECOVERY_KEY before the app is allowed to write, so it is never overwritten.
   useEffect(() => {
+    let raw: string | null = null;
     try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as NetworkData;
-        // One-time hydration from browser storage, which isn't available during server rendering.
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        if (parsed?.version === 1) setData(parsed);
-      }
+      raw = window.localStorage.getItem(STORAGE_KEY);
     } catch {
-      // Corrupt storage: fall back to an empty network rather than crashing.
+      // Storage blocked (e.g. some private modes): run with an empty network.
     }
+    const result = parseSaved(raw);
+    const keepCopy = (message: string) => {
+      try {
+        window.localStorage.setItem(RECOVERY_KEY, JSON.stringify({ savedAt: new Date().toISOString(), raw }));
+        setNotice({ kind: "recovered", message });
+      } catch {
+        setNotice({ kind: "save-failed", message: `${message} This browser's storage is full, so the app could not keep a copy. Nothing will be saved until you clear space.` });
+        return false;
+      }
+      return true;
+    };
+    let writable = true;
+    if (result.status === "ok") {
+      // One-time hydration from browser storage, which isn't available during server rendering.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setData(result.data);
+      if (result.report.dropped > 0) {
+        writable = keepCopy(
+          `${result.report.dropped} saved ${result.report.dropped === 1 ? "item was" : "items were"} damaged and left out. A copy of the original data was kept.`,
+        );
+      }
+    } else if (result.status === "unreadable") {
+      writable = keepCopy(`${result.reason} A copy was kept so nothing is lost, and you can download it below.`);
+    }
+    if (!writable) setBlocked(true);
     setReady(true);
   }, []);
 
   useEffect(() => {
-    if (ready) window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data, ready]);
+    if (!ready || blocked) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNotice((n) => (n?.kind === "save-failed" ? null : n));
+    } catch {
+      setNotice({
+        kind: "save-failed",
+        message: "Your latest changes couldn't be saved because this browser's storage is full. Save a backup now so nothing is lost.",
+      });
+    }
+  }, [data, ready, blocked]);
+
+  // Another tab or the installed app changed the data: follow it instead of overwriting it.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== STORAGE_KEY || e.newValue === null) return;
+      const r = parseSaved(e.newValue);
+      if (r.status === "ok") setData(r.data);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const contactById = useCallback(
     (id: string) => data.contacts.find((c) => c.id === id),
@@ -86,6 +149,32 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     () => ({
       data,
       ready,
+      notice,
+      dismissNotice: () => setNotice(null),
+      recoveryCopy: () => {
+        try {
+          return window.localStorage.getItem(RECOVERY_KEY);
+        } catch {
+          return null;
+        }
+      },
+      replaceAll: (incoming) => setData({ ...incoming, onboarded: true }),
+      mergeIn: (incoming) => {
+        const { data: merged, summary } = mergeNetworks(data, incoming);
+        setData(merged);
+        return summary;
+      },
+      deleteAllData: () => {
+        try {
+          window.localStorage.removeItem(STORAGE_KEY);
+          window.localStorage.removeItem(RECOVERY_KEY);
+        } catch {
+          // nothing stored
+        }
+        setBlocked(false);
+        setNotice(null);
+        setData(emptyNetwork());
+      },
       contactById,
       nameOf,
       startFresh: (name) => setData({ ...emptyNetwork(name), onboarded: true }),
@@ -163,7 +252,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
       deleteReminder: (id) =>
         setData((prev) => ({ ...prev, reminders: prev.reminders.filter((r) => r.id !== id) })),
     }),
-    [data, ready, contactById, nameOf],
+    [data, ready, notice, contactById, nameOf],
   );
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;

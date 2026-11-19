@@ -22,3 +22,11 @@ Tests use fictional contacts only. "Pass" is recorded only for tests that were a
 | 14 | Installable | Production build | Manifest with name, icons, `standalone`; iPhone icon linked; offline helper active | Same (Playwright + curl) | Pass | Not yet tried on a real phone's home screen |
 | 15 | Works offline | Load app once, switch to offline, open Home, Circle, Map, Ask, Memory | Every page opens; saved data still there | Same (Playwright) | Pass | Pages never opened while online fall back to Home |
 | 16 | Fits a phone screen | Every tab at 412px wide | No sideways scrolling | Same (Playwright) | Pass | Fixed overflow on Home and My Circle |
+| 17 | Damaged saved data is kept | Saved data cut off mid-file, then reload | Original copied aside, warning shown, recovered copy downloadable from Backup | Same (unit test + Playwright) | Pass | One recovery slot; a second failure replaces the first copy |
+| 18 | Partly damaged data is repaired | Contacts missing fields, links to missing people, unknown categories | Fields filled in, broken links dropped and counted, nothing crashes | Same (unit tests) | Pass | — |
+| 19 | Phone to computer | Save backup on an emulated phone, load it from the welcome screen on a fresh desktop browser | Same people, notes and follow-ups | Same (Playwright) | Pass | File travels by the person's own means (AirDrop, email, Drive) |
+| 20 | Computer to phone, combine | Add a person on the computer, back up, combine on the phone | Person added; phone's own notes kept; nothing duplicated | Same (unit tests + Playwright) | Pass | Combine never deletes, so deletions on one device don't carry over; use Replace for an exact copy |
+| 21 | Replace needs confirmation | Load a backup, choose Replace | Confirmation listing what will be removed, then exact copy | Same (Playwright) | Pass | — |
+| 22 | Wrong or hostile files | Empty file, plain text, another app's JSON, newer format, file over 20 MB | Clear message, nothing changed | Same (unit tests + Playwright) | Pass | — |
+| 23 | Delete all my data | Type DELETE, confirm | Back to the welcome screen, saved data and recovery copy removed | Same (Playwright) | Pass | Backups saved elsewhere are untouched |
+| 24 | Backup page offline | Open Backup with no connection | Page loads | Same (Playwright) | Pass | Sharing a file still needs a way to send it |
