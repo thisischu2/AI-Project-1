@@ -4,8 +4,8 @@ import { motion } from "framer-motion";
 import { Copy, FileUp, Plus, Search, Users } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { blankContact, ContactForm } from "@/components/contact-form";
 import { ContactProfile } from "@/components/contact-profile";
+import { QuickCapture } from "@/components/quick-capture";
 import { Avatar, Badge, Button, Card, DemoBadge, EmptyState, Input, PageHeader, Sheet, cn } from "@/components/ui";
 import { findDuplicatePairs, type DuplicatePair } from "@/lib/duplicates";
 import { distancesFrom } from "@/lib/graph";
@@ -161,20 +161,23 @@ export default function CirclePage() {
         {selected && <ContactProfile id={selected} onDeleted={() => setSelected(null)} />}
       </Sheet>
       <Sheet open={creating} onClose={() => setCreating(false)} title="New contact">
-        <ContactForm
-          initial={blankContact()}
-          existing={data.contacts}
-          onOpenExisting={(id) => {
-            setCreating(false);
-            setSelected(id);
-          }}
-          onCancel={() => setCreating(false)}
-          onSubmit={(v) => {
-            const c = store.addContact(v);
-            setCreating(false);
-            setSelected(c.id);
-          }}
-        />
+        {creating && (
+          <QuickCapture
+            contacts={data.contacts}
+            onOpenExisting={(id) => {
+              setCreating(false);
+              setSelected(id);
+            }}
+            onCancel={() => setCreating(false)}
+            onSave={(v, links) => {
+              const c = store.addContact(v);
+              if (links.knowsYou) store.addConnection(ME, c.id);
+              if (links.introducerId) store.addConnection(links.introducerId, c.id, links.introducerLabel);
+              setCreating(false);
+              setSelected(c.id);
+            }}
+          />
+        )}
       </Sheet>
       <Sheet open={reviewing} onClose={() => setReviewing(false)} title="Possible duplicates" wide>
         <DuplicateReview pairs={duplicatePairs} onDone={() => setReviewing(false)} />

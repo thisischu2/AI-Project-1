@@ -26,6 +26,8 @@ export function ContactForm({
   existing,
   editingId,
   onOpenExisting,
+  hints,
+  extra,
 }: {
   initial: ContactInput;
   onSubmit: (value: ContactInput) => void;
@@ -35,6 +37,10 @@ export function ContactForm({
   existing?: Contact[];
   editingId?: string;
   onOpenExisting?: (id: string) => void;
+  /** Words each prefilled value came from (contact capture), shown under the field. */
+  hints?: Partial<Record<string, string[]>>;
+  /** Extra choices shown above the save button. */
+  extra?: React.ReactNode;
 }) {
   const [v, setV] = useState(initial);
   const [lists, setLists] = useState({
@@ -52,10 +58,21 @@ export function ContactForm({
   const toggleCat = (c: Category) =>
     set("categories", v.categories.includes(c) ? v.categories.filter((x) => x !== c) : [...v.categories, c]);
 
+  const hint = (key: string) => {
+    const from = hints?.[key];
+    if (!from?.length) return null;
+    return (
+      <p className="mt-1 text-xs text-violet-300/90">
+        From your words: {from.map((f) => `“${f}”`).join(", ")}
+      </p>
+    );
+  };
+
   const field = (key: "location" | "occupation" | "organization" | "email" | "phone", label: string, placeholder = "") => (
     <div>
       <Label htmlFor={`f-${key}`}>{label}</Label>
       <Input id={`f-${key}`} value={v[key] ?? ""} placeholder={placeholder} onChange={(e) => set(key, e.target.value || undefined)} />
+      {hint(key)}
     </div>
   );
 
@@ -83,7 +100,9 @@ export function ContactForm({
     >
       <div>
         <Label htmlFor="f-name">Name *</Label>
-        <Input id="f-name" value={v.name} onChange={(e) => set("name", e.target.value)} placeholder="Full name" autoFocus />
+        <Input id="f-name" value={v.name} onChange={(e) => set("name", e.target.value)} placeholder="Full name" autoFocus={!hints} />
+        {hint("name")}
+        {hints && !v.name && <p className="mt-1 text-xs text-amber-300">We couldn&apos;t tell the name from your description. Please type it.</p>}
       </div>
       <div>
         <Label>Categories</Label>
@@ -105,6 +124,7 @@ export function ContactForm({
             </button>
           ))}
         </div>
+        {hint("categories")}
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {field("occupation", "Occupation", "e.g. Product Designer")}
@@ -119,11 +139,13 @@ export function ContactForm({
             <span className="capitalize">{k}</span> <span className="text-zinc-500">(comma separated)</span>
           </Label>
           <Input id={`f-${k}`} value={lists[k]} onChange={(e) => setLists((p) => ({ ...p, [k]: e.target.value }))} />
+          {hint(k)}
         </div>
       ))}
       <div>
         <Label htmlFor="f-met">How you met</Label>
         <Input id="f-met" value={v.metContext ?? ""} onChange={(e) => set("metContext", e.target.value || undefined)} />
+        {hint("metContext")}
       </div>
       <div>
         <Label htmlFor="f-notes">Notes</Label>
@@ -155,7 +177,9 @@ export function ContactForm({
             + Add date
           </Button>
         </div>
+        {hint("birthday")}
       </div>
+      {extra}
       {error && <p className="text-sm text-red-300">{error}</p>}
       {dupes && dupes.length > 0 && (
         <div role="alert" className="space-y-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
