@@ -63,7 +63,7 @@ export function QuickCapture({
             id="describe"
             className="min-h-36"
             maxLength={MAX_DESCRIPTION}
-            placeholder="e.g. Met Sarah Lee at the ABA tech conference. She's an associate at Davis Polk in New York, into legal tech. sarah@example.com. Introduced by Marcus."
+            placeholder="e.g. Met Sarah Lee at the ABA tech conference. She's an associate at Hartwell Lane in New York, into legal tech. sarah@example.com. Introduced by Marcus."
             value={text}
             onChange={(e) => setText(e.target.value)}
             autoFocus

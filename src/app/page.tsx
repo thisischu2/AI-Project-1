@@ -9,7 +9,7 @@ import { NetworkGraph } from "@/components/network-graph";
 import { Avatar, Badge, Button, Card, DemoBadge, EmptyState, SectionTitle } from "@/components/ui";
 import { formatDate, todayISO, toPayload } from "@/lib/api";
 import { distancesFrom } from "@/lib/graph";
-import { relativeDay, upcoming } from "@/lib/reconnect";
+import { relativeDay, todayView, type UpcomingItem } from "@/lib/reconnect";
 import { discoverCandidates } from "@/lib/retrieval";
 import { useNetwork } from "@/lib/store";
 import { ME } from "@/lib/types";
@@ -26,8 +26,6 @@ export default function Dashboard() {
   const distances = useMemo(() => distancesFrom(data.connections, ME), [data.connections]);
   const reachable = distances.size - 1;
   const farthest = Math.max(0, ...distances.values());
-  const today = todayISO();
-  const items = useMemo(() => upcoming(data.contacts, data.reminders, today).slice(0, 5), [data.contacts, data.reminders, today]);
   const candidates = useMemo(() => discoverCandidates(toPayload(data) as NetworkPayload, 3), [data]);
   const recentContacts = [...data.contacts].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5);
   const recentMemories = [...data.interactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
@@ -82,6 +80,10 @@ export default function Dashboard() {
         </form>
       </motion.section>
 
+      <motion.section {...fade(2)}>
+        <TodayCard />
+      </motion.section>
+
       <motion.section {...fade(2)} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {stats.map(({ label, value, icon: Icon }) => (
           <Card key={label} className="p-4">
@@ -92,7 +94,7 @@ export default function Dashboard() {
         ))}
       </motion.section>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6">
         <motion.section {...fade(3)}>
           <SectionTitle
             action={
@@ -112,24 +114,6 @@ export default function Dashboard() {
           </Card>
         </motion.section>
 
-        <motion.section {...fade(4)}>
-          <SectionTitle>Reconnect</SectionTitle>
-          <Card className="p-2">
-            {items.length === 0 ? (
-              <EmptyState icon={<Bell size={20} />} title="Nothing coming up" body="Follow-ups and important dates appear here." />
-            ) : (
-              <ul>
-                {items.map((it) => (
-                  <li key={it.id} className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-white/[0.03]">
-                    {it.kind === "date" ? <CalendarHeart size={16} className="shrink-0 text-pink-400" /> : <Bell size={16} className="shrink-0 text-cobalt" />}
-                    <span className="min-w-0 flex-1 truncate text-sm">{it.title}</span>
-                    <Badge tone={it.daysAway !== undefined && it.daysAway < 0 ? "amber" : "neutral"}>{relativeDay(it.daysAway)}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        </motion.section>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -220,5 +204,84 @@ export default function Dashboard() {
         </motion.section>
       </div>
     </div>
+  );
+}
+
+/** Today: what's overdue, due today, due this week, undated, and important dates coming up. */
+function TodayCard() {
+  const { data, toggleReminder, contactById } = useNetwork();
+  const today = todayISO();
+  const v = useMemo(() => todayView(data.contacts, data.reminders, today), [data.contacts, data.reminders, today]);
+  const later = data.reminders.filter((r) => !r.done && r.dueDate && r.dueDate > today).length - v.thisWeek.length;
+  const groups: [string, UpcomingItem[], "amber" | "cobalt" | "neutral"][] = [
+    ["Overdue", v.overdue, "amber"],
+    ["Due today", v.dueToday, "cobalt"],
+    ["Next 7 days", v.thisWeek, "neutral"],
+    ["No date", v.undated, "neutral"],
+  ];
+  const empty = groups.every(([, g]) => !g.length) && !v.dates.length;
+  return (
+    <>
+      <SectionTitle>Today · {formatDate(today)}</SectionTitle>
+      <Card className="p-4">
+        {empty ? (
+          <EmptyState icon={<Bell size={20} />} title="Nothing due" body="Follow-ups you add in Memory or on a profile, and birthdays, show up here." />
+        ) : (
+          <div className="space-y-4">
+            {groups
+              .filter(([, g]) => g.length)
+              .map(([label, g, tone]) => (
+                <div key={label}>
+                  <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-silver">
+                    {label} <Badge tone={tone}>{g.length}</Badge>
+                  </p>
+                  <ul>
+                    {g.map((it) => (
+                      <li key={it.id}>
+                        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-white/[0.03]">
+                          <input
+                            type="checkbox"
+                            className="h-5 w-5 shrink-0 accent-blue-500"
+                            aria-label={`Mark "${it.title}" done`}
+                            onChange={() => toggleReminder(it.id)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm">{it.title}</span>
+                            {it.contactId && <span className="block truncate text-xs text-silver">{contactById(it.contactId)?.name}</span>}
+                          </span>
+                          {it.daysAway !== undefined && <span className="shrink-0 text-xs text-silver">{relativeDay(it.daysAway)}</span>}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            {v.dates.length > 0 && (
+              <div>
+                <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-silver">
+                  Important dates <Badge tone="neutral">{v.dates.length}</Badge>
+                </p>
+                <ul>
+                  {v.dates.map((it) => (
+                    <li key={it.id} className="flex min-h-11 items-center gap-3 px-2 py-1.5">
+                      <CalendarHeart size={16} className="shrink-0 text-pink-400" />
+                      <span className="min-w-0 flex-1 truncate text-sm">{it.title}</span>
+                      <span className="shrink-0 text-xs text-silver">
+                        {formatDate(it.date!)} · {relativeDay(it.daysAway)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {later > 0 && (
+              <Link href={`/ask?q=${encodeURIComponent("What follow-ups do I have?")}`} className="block px-2 text-xs text-silver underline underline-offset-2">
+                {later} more {later === 1 ? "follow-up" : "follow-ups"} later
+              </Link>
+            )}
+          </div>
+        )}
+      </Card>
+    </>
   );
 }

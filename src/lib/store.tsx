@@ -4,8 +4,8 @@
  * v1 storage layer: keeps the user's network in browser localStorage.
  * Saved data is checked on load (src/lib/persistence.ts) and never silently replaced.
  *
- * Every read/write goes through this one provider, so replacing it with a
- * Supabase-backed implementation later only touches this file.
+ * Every read/write goes through this one provider. Data never leaves the
+ * device except in backup files the person saves themselves.
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { buildDemoNetwork, emptyNetwork } from "./demo-data";

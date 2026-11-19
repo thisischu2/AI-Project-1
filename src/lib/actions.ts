@@ -6,7 +6,7 @@
  * ("remind me to…", "draft a message to…"). Drafts use only facts you saved.
  * Nothing here changes data: the page asks you to confirm before saving.
  */
-import { answerQuestion, draftIntroduction, type Answer, type Draft } from "./assistant";
+import { answerQuestion, draftIntroduction, type Answer, type AskOptions, type Draft } from "./assistant";
 import { findDueDate, tidy } from "./memory";
 import { hasConnection } from "./graph";
 import { findMentioned, pairEvidence } from "./retrieval";
@@ -67,7 +67,7 @@ const DRAFT =
 const OPEN = /^\s*(?:please\s+)?(open|show(?: me)?|view|pull up|go to)\b/i;
 
 /** Answer a question, and offer the actions that fit it. */
-export function askWithActions(question: string, network: NetworkPayload, today: string): ActionAnswer {
+export function askWithActions(question: string, network: NetworkPayload, today: string, opts: AskOptions = {}): ActionAnswer {
   const mentioned = findMentioned(question, network.contacts);
   const person = mentioned[0];
 
@@ -94,7 +94,7 @@ export function askWithActions(question: string, network: NetworkPayload, today:
   if (DRAFT.test(question)) {
     if (mentioned.length >= 2 && /intro/i.test(question)) {
       const [a, b] = mentioned;
-      const evidence = pairEvidence(a, b);
+      const evidence = pairEvidence(a, b, network.connections, (id) => network.contacts.find((c) => c.id === id)?.name ?? "someone");
       const linked = hasConnection(network.connections, a.id, b.id);
       const d = draftIntroduction(a, b, evidence, network.profileName);
       return {
@@ -132,7 +132,7 @@ export function askWithActions(question: string, network: NetworkPayload, today:
   }
 
   // Everything else: the usual answer, plus next steps when it's about one person.
-  const a = answerQuestion(question, network);
+  const a = answerQuestion(question, network, { ...opts, today });
   const actions: AskAction[] = [];
   if (a.referencedContactIds.length === 1 && a.paths.length === 0) {
     const c = network.contacts.find((x) => x.id === a.referencedContactIds[0]);

@@ -1,9 +1,8 @@
 /**
  * Core data model for 6IX DEGREES.
  *
- * These shapes mirror the Supabase tables in supabase/migrations so that the
- * browser-storage version (v1) can be swapped for the database later without
- * changing the UI.
+ * Everything is stored on the device (localStorage). There is no database
+ * and no account; see docs/archive/supabase-not-used for an unused design.
  */
 
 export type Category =

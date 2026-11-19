@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { demoConnections, demoContacts, demoInteractions } from "./demo-data";
-import { discoverCandidates, findMentioned, selectForAsk } from "./retrieval";
+import { discoverCandidates, findMentioned, pairEvidence, selectForAsk } from "./retrieval";
 import { NetworkPayloadSchema } from "./validation";
 
 const network = NetworkPayloadSchema.parse({
@@ -65,5 +65,29 @@ describe("discoverCandidates", () => {
       connections: [],
     });
     expect(discoverCandidates(loc)).toEqual([]);
+  });
+});
+
+describe("pairEvidence: field of work and mutual connections", () => {
+  const base = { categories: [], tags: [], interests: [], goals: [], skills: [], importantDates: [] };
+  const a = { ...base, id: "a", name: "Ana", occupation: "Senior Policy Analyst", interests: ["hiking"] };
+  const b = { ...base, id: "b", name: "Ben", occupation: "Policy Associate", interests: ["hiking"] };
+  const m = { ...base, id: "m", name: "Mo" };
+  const conns = [
+    { id: "1", sourceId: "a", targetId: "m" },
+    { id: "2", sourceId: "m", targetId: "b" },
+  ];
+  const name = (id: string) => ({ a: "Ana", b: "Ben", m: "Mo" })[id] ?? "?";
+
+  it("names the shared field, ignoring generic title words", () => {
+    const e = pairEvidence(a as never, b as never, conns, name);
+    expect(e.find((x) => x.kind === "same_field")?.detail).toBe("Both work in policy (Senior Policy Analyst and Policy Associate)");
+    expect(pairEvidence({ ...a, occupation: "Senior Associate" } as never, { ...b, occupation: "Associate" } as never).some((x) => x.kind === "same_field")).toBe(false);
+  });
+
+  it("adds a mutual connection only alongside other evidence", () => {
+    expect(pairEvidence(a as never, b as never, conns, name).find((x) => x.kind === "mutual_connection")?.detail).toMatch(/^Both know Mo/);
+    const bare = pairEvidence({ ...m, id: "a" } as never, { ...m, id: "b" } as never, conns, name);
+    expect(bare).toEqual([]);
   });
 });

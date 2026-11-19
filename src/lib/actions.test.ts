@@ -4,7 +4,7 @@ import { demoConnections, demoContacts, demoInteractions } from "./demo-data";
 import { NetworkPayloadSchema } from "./validation";
 
 const network = NetworkPayloadSchema.parse({
-  profileName: "Chu",
+  profileName: "Sam",
   contacts: demoContacts,
   connections: demoConnections,
   interactions: demoInteractions,
@@ -47,7 +47,7 @@ describe("draft requests", () => {
     const d = a.actions.find((x) => x.type === "draft")!;
     expect(d.type === "draft" && d.draft.body).toMatch(/^Hi Priya,/);
     expect(d.type === "draft" && d.draft.body).toContain("I remember you were hoping to find a summer role in tech policy.");
-    expect(d.type === "draft" && d.draft.body).toMatch(/Best,\nChu$/);
+    expect(d.type === "draft" && d.draft.body).toMatch(/Best,\nSam$/);
     expect(d.type === "draft" && d.draft.basedOn).toContain("Their recorded goal: find a summer role in tech policy");
     expect(a.actions.some((x) => x.type === "open" && x.contactId === "demo-priya")).toBe(true);
   });

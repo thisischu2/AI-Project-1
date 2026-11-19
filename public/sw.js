@@ -5,16 +5,20 @@
  * the whole app keeps working with no internet connection.
  *
  * - Pages: try the network first (so updates arrive), fall back to the cache.
- * - Built files under /_next/static: cache first (their names change on update).
+ * - Built files under _next/static: cache first (their names change on update).
+ *
+ * Paths are relative to where the worker lives, so the same file works at the
+ * site root and on GitHub Pages under /<repo-name>/.
  */
-const VERSION = "6ix-v3";
-const PAGES = ["/", "/circle", "/map", "/memory", "/discover", "/ask", "/data", "/import"];
+const VERSION = "6ix-v4";
+const BASE = new URL("./", self.location.href).pathname; // "/" or "/AI-Project-1/"
+const PAGES = ["", "circle/", "map/", "memory/", "discover/", "ask/", "data/", "import/"].map((p) => BASE + p);
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(VERSION)
-      .then((cache) => cache.addAll([...PAGES, "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"]))
+      .then((cache) => cache.addAll([...PAGES, BASE + "manifest.webmanifest", BASE + "icon-192.png", BASE + "icon-512.png"]))
       .then(() => self.skipWaiting()),
   );
 });
@@ -54,11 +58,11 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  if (url.pathname.startsWith("/_next/static/") || /\.(png|ico|svg|woff2?)$/.test(url.pathname)) {
+  if (url.pathname.startsWith(BASE + "_next/static/") || /\.(png|ico|svg|woff2?)$/.test(url.pathname)) {
     event.respondWith(cacheFirst(request));
   } else if (request.mode === "navigate") {
     // Open the saved copy of the page; if it was never visited, open Home.
-    event.respondWith(networkFirst(request, url.pathname).catch(() => caches.match("/")));
+    event.respondWith(networkFirst(request, url.pathname).catch(() => caches.match(BASE)));
   } else {
     // In-app page data (React Server Component payloads) and anything else.
     event.respondWith(networkFirst(request));

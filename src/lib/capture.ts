@@ -2,7 +2,7 @@
  * CONTACT CAPTURE, in plain code (no AI).
  *
  * Reads a description you typed ("Met Sarah Lee at the ABA conference. She's an
- * associate at Davis Polk in New York, into legal tech…") and fills in what the
+ * associate at Hartwell Lane in New York, into legal tech…") and fills in what the
  * wording plainly says. Every value keeps the words it came from, so the review
  * screen can show why. Anything not clearly written stays blank: nothing is
  * guessed or looked up, and nothing is saved until you approve it.

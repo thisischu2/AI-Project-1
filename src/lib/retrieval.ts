@@ -88,7 +88,7 @@ export function selectForAsk(question: string, network: NetworkPayload): AskCont
     id === "me" ? "You" : (network.contacts.find((c) => c.id === id)?.name ?? "Unknown");
   const mentioned = findMentioned(question, network.contacts);
 
-  // Paths are computed deterministically and handed to Claude as verified facts.
+  // Paths are computed deterministically (breadth-first search) and used as verified facts.
   const pathFacts: PathFact[] = [];
   if (isPathQuestion(question) && mentioned.length > 0) {
     // Two names: path between them. One name: path from you to them.
@@ -125,7 +125,7 @@ export function selectForAsk(question: string, network: NetworkPayload): AskCont
 /* ------------------------------ DISCOVER ------------------------------ */
 
 export interface Evidence {
-  kind: "shared_interest" | "goal_match" | "same_location";
+  kind: "shared_interest" | "goal_match" | "same_field" | "same_location" | "mutual_connection";
   detail: string;
 }
 
@@ -157,14 +157,35 @@ function goalMatches(seeker: PayloadContact, helper: PayloadContact): Evidence[]
   return out;
 }
 
-/** What two people's records have in common. Location only counts alongside something else. */
-export function pairEvidence(a: PayloadContact, b: PayloadContact): Evidence[] {
+// Job-title words that say nothing about the field itself.
+const GENERIC_TITLE = new Set(
+  "senior junior lead head chief manager director associate assistant intern student staff vice president founder cofounder owner partner principal officer member specialist coordinator consultant".split(" "),
+);
+
+/**
+ * What two people's records have in common. Same city and a shared
+ * connection only count alongside something else.
+ */
+export function pairEvidence(a: PayloadContact, b: PayloadContact, connections: NetworkPayload["connections"] = [], nameOf?: (id: string) => string): Evidence[] {
   const evidence: Evidence[] = [];
   const bInterests = new Map(b.interests.map((x) => [norm(x), x]));
   for (const x of a.interests) {
     if (bInterests.has(norm(x))) evidence.push({ kind: "shared_interest", detail: `Both list "${x}" as an interest` });
   }
   evidence.push(...goalMatches(a, b), ...goalMatches(b, a));
+  // Same field of work: a shared, specific word in their job titles ("policy", "design").
+  const field = (c: PayloadContact) => new Set(tokens(c.occupation ?? "").filter((t) => !GENERIC_TITLE.has(t)));
+  const fa = field(a);
+  const sharedField = [...field(b)].filter((t) => fa.has(t));
+  if (sharedField.length)
+    evidence.push({ kind: "same_field", detail: `Both work in ${sharedField.join(", ")} (${a.occupation} and ${b.occupation})` });
+  // Supporting only: a person you've recorded as knowing both.
+  if (evidence.length && nameOf) {
+    const neighbours = (id: string) => new Set(connections.flatMap((e) => (e.sourceId === id ? [e.targetId] : e.targetId === id ? [e.sourceId] : [])));
+    const na = neighbours(a.id);
+    const mutual = [...neighbours(b.id)].filter((id) => na.has(id) && id !== "me");
+    if (mutual.length) evidence.push({ kind: "mutual_connection", detail: `Both know ${mutual.map(nameOf).join(" and ")}, so there's someone in common` });
+  }
   // Location alone is too weak to suggest an introduction; it only supports other evidence.
   if (evidence.length && a.location && b.location && norm(a.location) === norm(b.location))
     evidence.push({ kind: "same_location", detail: `Both are recorded in ${a.location}` });
@@ -177,13 +198,15 @@ export function pairEvidence(a: PayloadContact, b: PayloadContact): Evidence[] {
  */
 export function discoverCandidates(network: NetworkPayload, limit = 8): Candidate[] {
   const people = network.contacts;
+  const names = new Map(people.map((c) => [c.id, c.name]));
+  const nameOf = (id: string) => names.get(id) ?? "someone";
   const out: Candidate[] = [];
   for (let i = 0; i < people.length; i++) {
     for (let j = i + 1; j < people.length; j++) {
       const a = people[i];
       const b = people[j];
       if (hasConnection(network.connections, a.id, b.id)) continue;
-      const evidence = pairEvidence(a, b);
+      const evidence = pairEvidence(a, b, network.connections, nameOf);
       if (evidence.length === 0) continue;
       const score = evidence.reduce((s, e) => s + (e.kind === "goal_match" ? 3 : e.kind === "shared_interest" ? 2 : 1), 0);
       out.push({ aId: a.id, bId: b.id, evidence, score });

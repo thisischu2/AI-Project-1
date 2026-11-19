@@ -21,9 +21,9 @@ const EXAMPLES = [
   "Who do I know in New York?",
   "What did I last discuss with Marcus?",
   "How am I connected to James?",
-  "Who might benefit from an introduction?",
+  "What's due this week?",
+  "Who are my mentors?",
   "Draft a message to Priya",
-  "Remind me to call Marcus on Friday",
 ];
 
 export default function AskPage() {
@@ -40,7 +40,7 @@ export default function AskPage() {
     const q = question.trim();
     if (!q) return;
     setInput("");
-    setTurns((t) => [...t, { q, a: askWithActions(q, toPayload(data) as NetworkPayload, todayISO()) }]);
+    setTurns((t) => [...t, { q, a: askWithActions(q, toPayload(data) as NetworkPayload, todayISO(), { reminders: data.reminders }) }]);
   };
 
   // Support links like /ask?q=... from other pages.
@@ -49,7 +49,7 @@ export default function AskPage() {
     const q = new URLSearchParams(window.location.search).get("q");
     if (q) {
       autoAsked.current = true;
-      window.history.replaceState(null, "", "/ask");
+      window.history.replaceState(null, "", `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/ask/`);
       queueMicrotask(() => ask(q));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
