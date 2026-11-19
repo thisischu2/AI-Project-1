@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Compass, Copy, PenLine, X } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Opportunities } from "@/components/opportunities";
 import { Avatar, Badge, Button, Card, EmptyState, PageHeader, Sheet, Textarea } from "@/components/ui";
 import { toPayload } from "@/lib/api";
 import { draftIntroduction, suggestIntroductions, type Suggestion } from "@/lib/assistant";
@@ -22,9 +23,11 @@ export default function DiscoverPage() {
     <>
       <PageHeader
         title="Discover"
-        subtitle="Possible introductions between people you know, based only on what you've recorded."
+        subtitle="Who might help with your goals, and introductions between people you know. Based only on what you've recorded."
       />
-      <p className="-mt-4 mb-6 max-w-2xl text-xs text-silver">
+      <Opportunities />
+      <h2 className="mb-1 text-lg font-semibold">Introductions between people you know</h2>
+      <p className="mb-6 max-w-2xl text-xs text-silver">
         The app finds pairs who aren&apos;t connected yet and share recorded interests or have complementary goals and skills.
         Location alone never counts. These are possibilities, not certainties, and nothing is shared without you.
       </p>

@@ -57,6 +57,10 @@ interface Store {
   mergeContactInto: (keepId: string, removeId: string) => void;
   /** Remember that two contacts are different people. */
   dismissDuplicate: (aId: string, bId: string) => void;
+  /** Your goals: what you want your network to help with. */
+  setGoals: (goals: string[]) => void;
+  /** Hide one person from one goal's matches. */
+  dismissOpportunity: (key: string) => void;
   /** Add many contacts at once, and/or update existing ones (used by import). */
   applyImport: (add: ContactInput[], update: { id: string; patch: Partial<ContactInput> }[]) => void;
   // connections
@@ -232,6 +236,9 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
       mergeContactInto: (keepId, removeId) => setData((prev) => mergeContacts(prev, keepId, removeId)),
       dismissDuplicate: (aId, bId) =>
         setData((prev) => ({ ...prev, dismissedDuplicates: [...new Set([...(prev.dismissedDuplicates ?? []), pairId(aId, bId)])] })),
+      setGoals: (goals) => setData((prev) => ({ ...prev, profile: { ...prev.profile, priorities: goals } })),
+      dismissOpportunity: (key) =>
+        setData((prev) => ({ ...prev, dismissedOpportunities: [...new Set([...(prev.dismissedOpportunities ?? []), key])] })),
       applyImport: (add, update) =>
         setData((prev) => {
           const patches = new Map(update.map((u) => [u.id, u.patch]));

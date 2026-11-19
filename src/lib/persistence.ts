@@ -146,6 +146,7 @@ export function normalizeNetwork(value: unknown): { data: NetworkData; report: N
       reminders: uniqueById(list(value.reminders).map((r) => normalizeReminder(r, ids, report)), report),
       onboarded: value.onboarded !== false,
       ...(Array.isArray(value.dismissedDuplicates) ? { dismissedDuplicates: strList(value.dismissedDuplicates, 5000) } : {}),
+      ...(Array.isArray(value.dismissedOpportunities) ? { dismissedOpportunities: strList(value.dismissedOpportunities, 5000) } : {}),
     },
     report,
   };
@@ -288,7 +289,11 @@ export function mergeNetworks(current: NetworkData, incoming: NetworkData): { da
   return {
     data: {
       ...current,
-      profile: current.profile.name ? current.profile : incoming.profile,
+      profile: {
+        ...(current.profile.name ? current.profile : incoming.profile),
+        // Goals from both devices are kept.
+        priorities: [...new Map([...current.profile.priorities, ...incoming.profile.priorities].map((p) => [p.toLowerCase(), p])).values()].slice(0, 20),
+      },
       contacts: [...contacts.values()],
       connections,
       interactions: addById(current.interactions, incoming.interactions, "interactions"),
@@ -296,6 +301,9 @@ export function mergeNetworks(current: NetworkData, incoming: NetworkData): { da
       onboarded: true,
       ...(current.dismissedDuplicates || incoming.dismissedDuplicates
         ? { dismissedDuplicates: [...new Set([...(current.dismissedDuplicates ?? []), ...(incoming.dismissedDuplicates ?? [])])] }
+        : {}),
+      ...(current.dismissedOpportunities || incoming.dismissedOpportunities
+        ? { dismissedOpportunities: [...new Set([...(current.dismissedOpportunities ?? []), ...(incoming.dismissedOpportunities ?? [])])] }
         : {}),
     },
     summary,

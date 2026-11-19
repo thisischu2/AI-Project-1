@@ -60,3 +60,9 @@ Tests use fictional contacts only. "Pass" is recorded only for tests that were a
 | 52 | No person named | "Draft a message to my landlord" | Asks who; no draft | Same (unit tests + phone browser) | Pass | — |
 | 53 | Nothing saved without a tap | Ask about Marcus, open drafts and profiles | Follow-up count unchanged until "Save follow-up" | Same (phone browser) | Pass | — |
 | 54 | Open in email or text app | Draft for someone with a saved email or phone | mailto:/sms: link with the draft; the person sends it from their own app | Not run (demo people have no email or phone) | Not run | Some phones ignore the sms body |
+| 55 | Goal matches | Demo goal "find a summer role in tech policy" | Leo (2°, via Priya) then Priya (1°), each with reasons; Sofia ("civic tech" only) left out | Same (unit tests + phone browser) | Pass | Exact word matching with simple word forms; no synonyms ("lawyer" doesn't match "attorney") |
+| 56 | No weak matches | "move to Toronto", "help me get a job", "zzz qqq", "staying close to friends" | No one suggested; "Nobody in your records matches this goal yet" | Same (unit tests + phone browser) | Pass | — |
+| 57 | Note reasons | "start a design consultancy" | Marcus, with "Your note on … mentions" linking to the note | Same (unit tests + phone browser) | Pass | — |
+| 58 | Drafts | Draft for Marcus (1°); intro request for Leo (2°) | Direct ask; or "Could you introduce me to Leo?" to the person in between | Same (unit tests + phone browser) | Pass | You send it yourself |
+| 59 | Dismiss and goals persist | "Not relevant" on Leo; reload; remove a goal; add a duplicate goal | Leo hidden for that goal only, after reload too; goal removed; duplicate refused | Same (unit tests + phone browser) | Pass | — |
+| 60 | Goals across devices | Combine two backups with different goals and dismissals | Both kept, no duplicates | Same (unit tests) | Pass | — |

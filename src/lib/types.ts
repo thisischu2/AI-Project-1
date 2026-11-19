@@ -112,6 +112,8 @@ export interface NetworkData {
   onboarded: boolean;
   /** Pairs ("idA|idB") the person marked as different people, so they aren't flagged again. */
   dismissedDuplicates?: string[];
+  /** Opportunity matches ("goal|contactId") the person said aren't relevant. */
+  dismissedOpportunities?: string[];
 }
 
 export const ME = "me";
