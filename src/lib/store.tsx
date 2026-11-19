@@ -10,6 +10,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { buildDemoNetwork, emptyNetwork } from "./demo-data";
 import { hasConnection } from "./graph";
+import { mergeContacts, pairId } from "./duplicates";
 import { mergeNetworks, parseSaved, type MergeSummary } from "./persistence";
 import type { Connection, Contact, Interaction, NetworkData, Reminder } from "./types";
 
@@ -52,6 +53,12 @@ interface Store {
   addContact: (input: ContactInput) => Contact;
   updateContact: (id: string, patch: Partial<ContactInput>) => void;
   deleteContact: (id: string) => void;
+  /** Merge one contact into another (history and connections move over). */
+  mergeContactInto: (keepId: string, removeId: string) => void;
+  /** Remember that two contacts are different people. */
+  dismissDuplicate: (aId: string, bId: string) => void;
+  /** Add many contacts at once, and/or update existing ones (used by import). */
+  applyImport: (add: ContactInput[], update: { id: string; patch: Partial<ContactInput> }[]) => void;
   // connections
   addConnection: (sourceId: string, targetId: string, label?: string) => boolean;
   deleteConnection: (id: string) => void;
@@ -221,6 +228,22 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
           interactions: prev.interactions.filter((i) => i.contactId !== id),
           reminders: prev.reminders.filter((r) => r.contactId !== id),
         })),
+
+      mergeContactInto: (keepId, removeId) => setData((prev) => mergeContacts(prev, keepId, removeId)),
+      dismissDuplicate: (aId, bId) =>
+        setData((prev) => ({ ...prev, dismissedDuplicates: [...new Set([...(prev.dismissedDuplicates ?? []), pairId(aId, bId)])] })),
+      applyImport: (add, update) =>
+        setData((prev) => {
+          const patches = new Map(update.map((u) => [u.id, u.patch]));
+          const t = today();
+          return {
+            ...prev,
+            contacts: [
+              ...prev.contacts.map((c) => (patches.has(c.id) ? { ...c, ...patches.get(c.id), updatedAt: t } : c)),
+              ...add.map((input) => ({ ...input, id: newId("c"), createdAt: t, updatedAt: t })),
+            ],
+          };
+        }),
 
       addConnection: (sourceId, targetId, label) => {
         if (sourceId === targetId || hasConnection(data.connections, sourceId, targetId)) return false;

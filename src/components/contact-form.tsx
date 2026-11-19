@@ -1,6 +1,8 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { useState } from "react";
+import { findDuplicates, type DuplicateMatch } from "@/lib/duplicates";
 import { CATEGORIES, type Category, type Contact } from "@/lib/types";
 import { Button, Input, Label, Textarea, cn } from "./ui";
 
@@ -21,11 +23,18 @@ export function ContactForm({
   onSubmit,
   onCancel,
   submitLabel = "Save contact",
+  existing,
+  editingId,
+  onOpenExisting,
 }: {
   initial: ContactInput;
   onSubmit: (value: ContactInput) => void;
   onCancel: () => void;
   submitLabel?: string;
+  /** Other contacts to check for duplicates before saving. */
+  existing?: Contact[];
+  editingId?: string;
+  onOpenExisting?: (id: string) => void;
 }) {
   const [v, setV] = useState(initial);
   const [lists, setLists] = useState({
@@ -36,6 +45,8 @@ export function ContactForm({
   });
   const [dates, setDates] = useState(initial.importantDates);
   const [error, setError] = useState("");
+  // Possible duplicates found on save; shown once, then "Save anyway" goes through.
+  const [dupes, setDupes] = useState<DuplicateMatch[] | null>(null);
 
   const set = <K extends keyof ContactInput>(k: K, value: ContactInput[K]) => setV((p) => ({ ...p, [k]: value }));
   const toggleCat = (c: Category) =>
@@ -55,6 +66,10 @@ export function ContactForm({
         e.preventDefault();
         if (!v.name.trim()) return setError("A name is required.");
         if (v.email && !/^\S+@\S+\.\S+$/.test(v.email)) return setError("That email doesn't look right.");
+        if (existing && dupes === null) {
+          const found = findDuplicates({ name: v.name, email: v.email, phone: v.phone }, existing, editingId);
+          if (found.length) return setDupes(found.slice(0, 3));
+        }
         onSubmit({
           ...v,
           name: v.name.trim(),
@@ -142,12 +157,35 @@ export function ContactForm({
         </div>
       </div>
       {error && <p className="text-sm text-red-300">{error}</p>}
+      {dupes && dupes.length > 0 && (
+        <div role="alert" className="space-y-3 rounded-xl border border-amber-500/25 bg-amber-500/5 p-3 text-sm">
+          <p className="flex items-center gap-2 font-medium text-amber-200">
+            <AlertTriangle size={15} /> This might already be in your circle
+          </p>
+          <ul className="space-y-2">
+            {dupes.map((d) => (
+              <li key={d.contact.id} className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="text-platinum">{d.contact.name}</span>
+                  <span className="block text-xs text-amber-100/80">{d.reasons.join(" · ")}</span>
+                </span>
+                {onOpenExisting && (
+                  <Button type="button" size="sm" onClick={() => onOpenExisting(d.contact.id)}>
+                    Open
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-amber-100/80">If it&apos;s a different person, save again. You can also merge duplicates later from My Circle.</p>
+        </div>
+      )}
       <div className="flex justify-end gap-2 border-t border-white/5 pt-5">
         <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" variant="primary">
-          {submitLabel}
+          {dupes?.length ? "Save anyway" : submitLabel}
         </Button>
       </div>
     </form>
