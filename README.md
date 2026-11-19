@@ -11,7 +11,7 @@
 | Tab | What you can do | How it works |
 | --- | --- | --- |
 | **Home** | Network stats, map preview, follow-ups and upcoming dates, recent contacts and memories, possible introductions, a search bar | Plain code |
-| **My Circle** | Add, edit, search, filter and delete contacts; multiple categories; important dates; timeline; follow-ups; record who knows whom | Plain code |
+| **My Circle** | Add someone by describing them in your own words ("Met Sarah Lee at the ABA conference, associate at Davis Polk…"): the form is filled from your wording, each value shows the words it came from, possible duplicates are flagged, and nothing is saved until you press Save. Edit, search, filter and delete contacts; multiple categories; important dates; timeline; follow-ups; record who knows whom | Plain code |
 | **The Map** | Interactive map (pinch, drag, tap), category filters, shortest known path with highlighting, "no recorded path" handling | Breadth-first search |
 | **Memory** | Jot down a conversation: who, how, when. If your note names a saved person, they're picked for you. Promises in your wording ("I'll send her my outline by Friday", "she said she'd send me the list next week") are offered as follow-ups, linked to the note, and saved only if you tick them. Search every note, with matches highlighted. Each profile has an "At a glance" summary where every line links to the notes it came from | Plain code (name matching, wording rules) |
 | **Discover** | Possible introductions with the recorded evidence for each, plus a consent-gated introduction template you send yourself | Keyword matching on recorded interests, goals and skills |
