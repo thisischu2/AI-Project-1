@@ -1,13 +1,15 @@
 "use client";
 
-import { Briefcase, CalendarDays, Link2, MapPin, Pencil, Trash2 } from "lucide-react";
+import { BellPlus, Briefcase, CalendarDays, Link2, MapPin, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { formatDate, todayISO } from "@/lib/api";
 import { distancesFrom } from "@/lib/graph";
+import { detectCommitments, searchNotes, summarizePerson, type Commitment } from "@/lib/memory";
 import { useNetwork } from "@/lib/store";
 import { INTERACTION_KINDS, ME, type InteractionKind } from "@/lib/types";
 import { ContactForm } from "./contact-form";
+import { Highlight, SearchBox } from "./note-search";
 import { Avatar, Badge, Button, DemoBadge, Input, SectionTitle, Textarea, inputClass } from "./ui";
 
 export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () => void }) {
@@ -20,6 +22,11 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
   const [linkLabel, setLinkLabel] = useState("");
   const [note, setNote] = useState({ kind: "meeting" as InteractionKind, date: todayISO(), summary: "" });
   const [reminder, setReminder] = useState({ title: "", dueDate: "" });
+  const [query, setQuery] = useState("");
+  // Notes to highlight after tapping a summary line's source link.
+  const [focus, setFocus] = useState<string[]>([]);
+  // Promises found in the note just logged here, offered one by one.
+  const [offered, setOffered] = useState<{ noteId: string; items: Commitment[] } | null>(null);
 
   if (!contact) return <p className="text-sm text-silver">This contact no longer exists.</p>;
 
@@ -40,6 +47,15 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
   const links = data.connections.filter((c) => c.sourceId === id || c.targetId === id);
   const interactions = data.interactions.filter((i) => i.contactId === id).sort((a, b) => b.date.localeCompare(a.date));
   const reminders = data.reminders.filter((r) => r.contactId === id);
+  const summary = summarizePerson(contact, data.interactions, data.reminders, todayISO());
+  const hits = query.trim().length >= 2 ? searchNotes(query, interactions, []) : null;
+  const shown = hits ? hits.map((h) => ({ i: h.interaction, ranges: h.ranges })) : interactions.map((i) => ({ i, ranges: [] as [number, number][] }));
+  const noteById = new Map(interactions.map((i) => [i.id, i]));
+  const showNotes = (ids: string[]) => {
+    setQuery("");
+    setFocus(ids);
+    requestAnimationFrame(() => document.getElementById(`note-${ids[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
   const linkable = [{ id: ME, name: "You" }, ...data.contacts]
     .filter((c) => c.id !== id)
     .filter((c) => !links.some((l) => l.sourceId === c.id || l.targetId === c.id));
@@ -102,6 +118,30 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
           </Button>
         )}
       </div>
+
+      {summary.length > 0 && (
+        <div>
+          <SectionTitle>At a glance</SectionTitle>
+          <p className="-mt-1 mb-2 text-xs text-silver">Built from your own notes and follow-ups. Tap a source to see the notes behind a line.</p>
+          <ul className="space-y-2 rounded-2xl border border-white/5 bg-white/[0.02] p-3 text-sm">
+            {summary.map((l) => (
+              <li key={l.label}>
+                <span className="text-silver">{l.label}: </span>
+                {l.text}
+                {l.sources.length > 0 && (
+                  <button
+                    type="button"
+                    className="ml-1.5 inline-flex min-h-8 items-center text-xs text-violet underline underline-offset-2"
+                    onClick={() => showNotes(l.sources)}
+                  >
+                    {l.sources.length === 1 ? "source note" : `${l.sources.length} source notes`}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {([
         ["Interests", contact.interests],
@@ -209,7 +249,9 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
           onSubmit={(e) => {
             e.preventDefault();
             if (!note.summary.trim()) return;
-            store.addInteraction({ contactId: id, ...note, summary: note.summary.trim() });
+            const noteId = store.addInteraction({ contactId: id, ...note, summary: note.summary.trim() });
+            const items = detectCommitments(note.summary, note.date || todayISO(), contact.name);
+            setOffered(items.length ? { noteId, items } : null);
             setNote({ ...note, summary: "" });
           }}
         >
@@ -241,12 +283,63 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
             </Button>
           </div>
         </form>
+        {offered && (
+          <div className="mb-4 rounded-2xl border border-violet/30 bg-violet/5 p-3">
+            <p className="flex items-center gap-1.5 text-sm font-medium">
+              <BellPlus size={15} className="text-violet" /> Promises spotted in that note
+            </p>
+            <p className="mb-2 text-xs text-silver">Found from your wording, so check them first.</p>
+            <ul className="space-y-2">
+              {offered.items.map((c) => (
+                <li key={c.sentence + c.title} className="flex flex-col gap-2 rounded-xl bg-white/5 p-2 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="min-w-0 text-sm">
+                    {c.title}
+                    {c.dueDate && <span className="text-silver"> · by {formatDate(c.dueDate)}</span>}
+                    <span className="block text-xs text-silver">&ldquo;{c.sentence}&rdquo;</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      store.addReminder({ contactId: id, title: c.title, dueDate: c.dueDate, sourceInteractionId: offered.noteId });
+                      const rest = offered.items.filter((x) => x !== c);
+                      setOffered(rest.length ? { ...offered, items: rest } : null);
+                    }}
+                  >
+                    Add follow-up
+                  </Button>
+                </li>
+              ))}
+            </ul>
+            <Button size="sm" variant="ghost" className="mt-2" onClick={() => setOffered(null)}>
+              No thanks
+            </Button>
+          </div>
+        )}
+        {interactions.length >= 3 && (
+          <div className="mb-3">
+            <SearchBox value={query} onChange={setQuery} label={`Search notes about ${contact.name}`} placeholder="Search these notes" />
+          </div>
+        )}
+        {focus.length > 0 && !hits && (
+          <p className="mb-3 flex items-center justify-between text-xs text-violet">
+            Highlighted: the {focus.length === 1 ? "note" : `${focus.length} notes`} behind that line.
+            <button type="button" className="min-h-8 px-2 text-silver underline" onClick={() => setFocus([])}>
+              Clear
+            </button>
+          </p>
+        )}
         {interactions.length === 0 ? (
           <p className="text-sm text-silver">No interactions logged yet.</p>
+        ) : hits && hits.length === 0 ? (
+          <p className="text-sm text-silver">No notes about {contact.name.split(" ")[0]} mention &ldquo;{query.trim()}&rdquo;.</p>
         ) : (
           <ol className="relative space-y-4 border-l border-white/10 pl-5">
-            {interactions.map((i) => (
-              <li key={i.id} className="relative">
+            {shown.map(({ i, ranges }) => (
+              <li
+                key={i.id}
+                id={`note-${i.id}`}
+                className={`relative rounded-lg transition-colors ${focus.includes(i.id) && !hits ? "bg-violet/10 p-2 ring-1 ring-violet/40" : ""}`}
+              >
                 <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-cobalt" />
                 <p className="text-xs text-silver">
                   <span className="capitalize">{i.kind}</span> · {formatDate(i.date)}
@@ -254,7 +347,9 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
                     remove
                   </button>
                 </p>
-                <p className="mt-0.5 text-sm">{i.summary}</p>
+                <p className="mt-0.5 text-sm">
+                  <Highlight text={i.summary} ranges={ranges} />
+                </p>
               </li>
             ))}
           </ol>
@@ -267,7 +362,14 @@ export function ContactProfile({ id, onDeleted }: { id: string; onDeleted?: () =
           {reminders.map((r) => (
             <li key={r.id} className="flex items-center gap-3 rounded-xl bg-white/[0.03] px-3 py-2 text-sm">
               <input type="checkbox" checked={r.done} onChange={() => store.toggleReminder(r.id)} aria-label={`Mark "${r.title}" done`} className="accent-cobalt" />
-              <span className={r.done ? "text-zinc-500 line-through" : ""}>{r.title}</span>
+              <span className="min-w-0">
+                <span className={r.done ? "text-zinc-500 line-through" : ""}>{r.title}</span>
+                {r.sourceInteractionId && noteById.has(r.sourceInteractionId) && (
+                  <button type="button" className="block text-left text-xs text-violet underline underline-offset-2" onClick={() => showNotes([r.sourceInteractionId!])}>
+                    from your note on {formatDate(noteById.get(r.sourceInteractionId)!.date)}
+                  </button>
+                )}
+              </span>
               {r.dueDate && <span className="ml-auto text-xs text-silver">{formatDate(r.dueDate)}</span>}
               <button className="text-zinc-500 hover:text-red-300" onClick={() => store.deleteReminder(r.id)} aria-label="Delete follow-up">
                 ×

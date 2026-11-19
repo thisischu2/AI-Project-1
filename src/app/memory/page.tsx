@@ -1,9 +1,11 @@
 "use client";
 
-import { Check, NotebookPen, Sparkles } from "lucide-react";
+import { BellPlus, Check, NotebookPen, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
+import { NoteHits, SearchBox } from "@/components/note-search";
 import { Avatar, Button, Card, EmptyState, Label, PageHeader, SectionTitle, Textarea, cn, inputClass } from "@/components/ui";
 import { formatDate, todayISO } from "@/lib/api";
+import { detectCommitments, searchNotes } from "@/lib/memory";
 import { findMentioned } from "@/lib/retrieval";
 import { useNetwork } from "@/lib/store";
 import { INTERACTION_KINDS, type InteractionKind } from "@/lib/types";
@@ -29,6 +31,9 @@ export default function MemoryPage() {
   const [followUpDate, setFollowUpDate] = useState("");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
+  const [query, setQuery] = useState("");
+  // Spotted promises the person ticked, keyed by sentence, with any date they changed.
+  const [picked, setPicked] = useState<Record<string, { on: boolean; date?: string }>>({});
 
   // Plain-code helper: if the note names someone you've saved, offer them.
   const detected = useMemo(
@@ -36,7 +41,13 @@ export default function MemoryPage() {
     [note, who, data.contacts],
   );
 
+  const chosenId = who || detected?.id || "";
+  const personName = chosenId === "new" ? newName : contactById(chosenId)?.name;
+  const spotted = useMemo(() => detectCommitments(note, date || todayISO(), personName || undefined), [note, date, personName]);
+  const hits = useMemo(() => searchNotes(query, data.interactions, data.contacts), [query, data.interactions, data.contacts]);
+
   const reset = () => {
+    setPicked({});
     setNote("");
     setWho("");
     setNewName("");
@@ -49,7 +60,7 @@ export default function MemoryPage() {
   const save = () => {
     setError("");
     setSaved("");
-    const chosen = who || detected?.id || "";
+    const chosen = chosenId;
     if (!note.trim()) return setError("Write a line about what happened.");
     if (!chosen) return setError("Choose who this is about.");
     let id = chosen;
@@ -57,9 +68,20 @@ export default function MemoryPage() {
       if (!newName.trim()) return setError("Give the new person a name.");
       id = store.addContact({ name: newName.trim(), categories: [], tags: [], interests: [], goals: [], skills: [], importantDates: [] }).id;
     }
-    store.addInteraction({ contactId: id, kind, date, summary: note.trim() });
-    if (followUp.trim()) store.addReminder({ contactId: id, title: followUp.trim(), dueDate: followUpDate || undefined });
-    setSaved(chosen === "new" ? newName.trim() : (contactById(id)?.name ?? ""));
+    const noteId = store.addInteraction({ contactId: id, kind, date, summary: note.trim() });
+    let added = 0;
+    for (const c of spotted) {
+      const p = picked[c.sentence + c.title];
+      if (!p?.on) continue;
+      store.addReminder({ contactId: id, title: c.title, dueDate: (p.date ?? c.dueDate) || undefined, sourceInteractionId: noteId });
+      added++;
+    }
+    if (followUp.trim()) {
+      store.addReminder({ contactId: id, title: followUp.trim(), dueDate: followUpDate || undefined, sourceInteractionId: noteId });
+      added++;
+    }
+    const name = chosen === "new" ? newName.trim() : (contactById(id)?.name ?? "");
+    setSaved(added ? `${name}'s timeline, with ${added} ${added === 1 ? "follow-up" : "follow-ups"}` : `${name}'s timeline`);
     reset();
   };
 
@@ -130,8 +152,50 @@ export default function MemoryPage() {
               </div>
             </div>
 
+            {spotted.length > 0 && (
+              <div className="rounded-2xl border border-violet/30 bg-violet/5 p-3">
+                <p className="flex items-center gap-1.5 text-sm font-medium">
+                  <BellPlus size={15} className="text-violet" /> Promises spotted in your note
+                </p>
+                <p className="mb-2 text-xs text-silver">Found from your wording, so check them. Tick any you want saved as a follow-up.</p>
+                <ul className="space-y-2">
+                  {spotted.map((c) => {
+                    const key = c.sentence + c.title;
+                    const p = picked[key];
+                    return (
+                      <li key={key} className="rounded-xl bg-white/5 p-2">
+                        <label className="flex min-h-11 cursor-pointer items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-1 h-5 w-5 shrink-0 accent-violet-500"
+                            checked={!!p?.on}
+                            onChange={(e) => setPicked({ ...picked, [key]: { ...p, on: e.target.checked } })}
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm">{c.title}</span>
+                            <span className="block text-xs text-silver">
+                              {c.owner === "them" ? "They said they would" : "You said you would"}: &ldquo;{c.sentence}&rdquo;
+                            </span>
+                          </span>
+                        </label>
+                        {p?.on && (
+                          <input
+                            type="date"
+                            aria-label={`Due date for ${c.title}`}
+                            className={cn(inputClass, "mt-2")}
+                            value={p.date ?? c.dueDate ?? ""}
+                            onChange={(e) => setPicked({ ...picked, [key]: { ...p, date: e.target.value } })}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
             <div>
-              <Label htmlFor="follow">Anything to follow up on? (optional)</Label>
+              <Label htmlFor="follow">{spotted.length ? "Anything else to follow up on? (optional)" : "Anything to follow up on? (optional)"}</Label>
               <input
                 id="follow"
                 className={inputClass}
@@ -153,7 +217,7 @@ export default function MemoryPage() {
             {error && <p className="text-sm text-red-300">{error}</p>}
             {saved && (
               <p className="flex items-center gap-2 text-sm text-emerald-300">
-                <Check size={15} /> Saved to {saved}&apos;s timeline.
+                <Check size={15} /> Saved to {saved}.
               </p>
             )}
             <Button variant="primary" className="w-full" onClick={save}>
@@ -164,7 +228,16 @@ export default function MemoryPage() {
 
         <div>
           <SectionTitle>Timeline</SectionTitle>
-          {timeline.length === 0 ? (
+          {timeline.length > 0 && (
+            <div className="mb-3">
+              <SearchBox value={query} onChange={setQuery} label="Search your notes" placeholder="Search notes, e.g. clerkship or Priya" />
+            </div>
+          )}
+          {query.trim().length >= 2 ? (
+            <Card className="p-5">
+              <NoteHits hits={hits} query={query} />
+            </Card>
+          ) : timeline.length === 0 ? (
             <Card>
               <EmptyState icon={<NotebookPen size={20} />} title="No memories yet" body="Your interactions will appear here, newest first." />
             </Card>

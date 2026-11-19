@@ -105,6 +105,7 @@ function normalizeReminder(v: unknown, ids: Set<string>, report: NormalizeReport
     title,
     dueDate: isoDate(v.dueDate),
     done: v.done === true,
+    ...(str(v.sourceInteractionId, 200) ? { sourceInteractionId: str(v.sourceInteractionId, 200) } : {}),
     createdAt: str(v.createdAt, 40) ?? nowIso(),
   };
 }
