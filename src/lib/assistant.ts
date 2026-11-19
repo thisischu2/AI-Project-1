@@ -15,6 +15,7 @@ import {
   type Candidate,
   type Evidence,
 } from "./retrieval";
+import type { Category } from "./types";
 import type { NetworkPayload, PayloadContact } from "./validation";
 
 export interface PathAnswer {
@@ -57,11 +58,148 @@ const isIntroQuestion = (q: string) => /\b(introduc|benefit|should meet|who shou
 const isLastTalkQuestion = (q: string) =>
   /\b(last|latest|recent|discuss|talk|spoke|speak|said|chat|conversation|catch up|met)\b/i.test(q);
 
+/** Follow-ups and today's date, which the network payload doesn't carry. */
+export interface AskOptions {
+  reminders?: { id: string; contactId?: string; title: string; dueDate?: string; done: boolean }[];
+  today?: string;
+}
+
+const CATEGORY_WORDS: [Category, RegExp][] = [
+  ["mentor", /\bmentors?\b/i],
+  ["friend", /\bfriends?\b/i],
+  ["family", /\bfamily|relatives?\b/i],
+  ["classmate", /\bclassmates?\b/i],
+  ["colleague", /\b(colleagues?|co-?workers?)\b/i],
+  ["collaborator", /\bcollaborators?\b/i],
+  ["community", /\bcommunity\b/i],
+  ["acquaintance", /\bacquaintances?\b/i],
+];
+
+/** What Ask 6ix can answer, shown when a question isn't one of them. */
+export const ASK_CAPABILITIES = [
+  'A person: "What did I last discuss with Marcus?"',
+  'A city: "Who do I know in Toronto?"',
+  'A field of work: "Who works in law?"',
+  'A relationship type: "Who are my mentors?"',
+  'Follow-ups: "What\'s due this week?" or "Follow-ups with Priya"',
+  'Recent conversations: "Who did I talk to recently?"',
+  'Connections: "Who does Marcus know?" or "How am I connected to James?"',
+  'Introductions: "Who might benefit from an introduction?"',
+  'Actions: "Draft a message to Priya" or "Remind me to call Leo on Friday"',
+];
+const capabilityText = () => `Here's what I can answer from your records:\n${ASK_CAPABILITIES.map((c) => `• ${c}`).join("\n")}`;
+
+const daysFrom = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86_400_000);
+
+/** Match words in someone's work fields (occupation, organization, skills, tags). */
+function fieldHits(field: string, contacts: PayloadContact[]) {
+  const want = tokens(field);
+  if (!want.length) return [];
+  return contacts.filter((c) => {
+    const have = tokens([c.occupation, c.organization, ...c.skills, ...c.tags].filter(Boolean).join(" "));
+    // "design" matches "Designer"; short words must match exactly.
+    return want.every((w) => have.some((h) => h === w || (w.length >= 4 && h.startsWith(w))));
+  });
+}
+
 /** Answer a question about the user's own network, using only stored records. */
-export function answerQuestion(question: string, network: NetworkPayload): Answer {
+export function answerQuestion(question: string, network: NetworkPayload, opts: AskOptions = {}): Answer {
   const ctx = selectForAsk(question, network);
   const mentioned = findMentioned(question, network.contacts);
   const nameById = new Map(network.contacts.map((c) => [c.id, c.name]));
+  const today = opts.today ?? new Date().toISOString().slice(0, 10);
+  const reminders = (opts.reminders ?? []).filter((r) => !r.done);
+
+  // "What can I ask?"
+  if (/^\s*(help|\?|what can (you|i) (do|ask)|what (questions|can i ask))\b/i.test(question)) {
+    return { answer: capabilityText(), referencedContactIds: [], gaps: [], paths: [] };
+  }
+
+  // 0a. "Who does Marcus know?" / "Who is Marcus connected to?": their recorded connections.
+  if (mentioned.length === 1 && /\bwho (?:does|do|did) .+ know\b|\bwho (?:is|are) .+ connected (?:to|with)\b|\bconnections? (?:of|for)\b|'s connections\b/i.test(question)) {
+    const c = mentioned[0];
+    const links = network.connections.filter((e) => e.sourceId === c.id || e.targetId === c.id);
+    const other = (e: (typeof links)[number]) => (e.sourceId === c.id ? e.targetId : e.sourceId);
+    const label = (id: string) => (id === "me" ? "You" : (nameById.get(id) ?? "Someone"));
+    return links.length
+      ? {
+          answer: `You've recorded ${links.length} ${links.length === 1 ? "connection" : "connections"} for ${c.name}:\n${links.map((e) => `• ${label(other(e))}${e.label ? ` (${e.label})` : ""}`).join("\n")}`,
+          referencedContactIds: [c.id, ...links.map(other).filter((id) => id !== "me")],
+          gaps: [],
+          paths: [],
+        }
+      : { answer: `You haven't recorded who ${c.name} knows yet. Add connections from their profile in My Circle.`, referencedContactIds: [c.id], gaps: [`connections for ${c.name}`], paths: [] };
+  }
+
+  // 0b. Follow-ups: overall, by time window, or for one person.
+  if (/\b(follow[- ]?ups?|reminders?|due|overdue|to-?dos?|commitments?|owe)\b/i.test(question) && !/\bremind me\b/i.test(question)) {
+    const window = /\btoday\b/i.test(question) ? 0 : /\btomorrow\b/i.test(question) ? 1 : /\bthis week|next 7 days|next week\b/i.test(question) ? 7 : /\bthis month|next 30 days\b/i.test(question) ? 30 : null;
+    const onlyOverdue = /\boverdue|late|missed\b/i.test(question);
+    let list = reminders.filter((r) => !mentioned.length || mentioned.some((m) => m.id === r.contactId));
+    if (onlyOverdue) list = list.filter((r) => r.dueDate && r.dueDate < today);
+    else if (window !== null) list = list.filter((r) => r.dueDate && daysFrom(today, r.dueDate) <= window);
+    list.sort((a, b) => (a.dueDate ?? "9999").localeCompare(b.dueDate ?? "9999"));
+    const when = (d?: string) => {
+      if (!d) return "no date";
+      const n = daysFrom(today, d);
+      return n < 0 ? `${-n} ${n === -1 ? "day" : "days"} overdue` : n === 0 ? "due today" : n === 1 ? "due tomorrow" : `due ${formatDay(d)}`;
+    };
+    const who = mentioned.length ? ` with ${mentioned.map((m) => m.name).join(" and ")}` : "";
+    const scope = onlyOverdue ? " overdue" : window === 0 ? " due today" : window === 1 ? " due by tomorrow" : window === 7 ? " due in the next 7 days" : window === 30 ? " due in the next 30 days" : " open";
+    return list.length
+      ? {
+          answer: `${list.length}${scope} ${list.length === 1 ? "follow-up" : "follow-ups"}${who}:\n${list
+            .map((r) => `• ${r.title}${r.contactId && !mentioned.length ? ` (${nameById.get(r.contactId) ?? "someone"})` : ""}, ${when(r.dueDate)}`)
+            .join("\n")}`,
+          referencedContactIds: [...new Set(list.map((r) => r.contactId).filter((x): x is string => !!x && nameById.has(x)))],
+          gaps: [],
+          paths: [],
+        }
+      : { answer: `No${scope} follow-ups${who}.`, referencedContactIds: mentioned.map((m) => m.id), gaps: [], paths: [] };
+  }
+
+  // 0c. "Who are my mentors?": the relationship categories you set.
+  const cat = CATEGORY_WORDS.find(([, rx]) => rx.test(question));
+  if (cat && mentioned.length === 0 && /\b(who|list|show|which|my|all)\b/i.test(question)) {
+    const hits = network.contacts.filter((c) => c.categories.includes(cat[0]));
+    return hits.length
+      ? {
+          answer: `You've marked ${hits.length} ${hits.length === 1 ? "person" : "people"} as ${cat[0]}:\n${hits.map((c) => `• ${describe(c)}`).join("\n")}`,
+          referencedContactIds: hits.map((c) => c.id),
+          gaps: [],
+          paths: [],
+        }
+      : { answer: `Nobody is marked as ${cat[0]} yet. You can set categories when you edit a person.`, referencedContactIds: [], gaps: [`contacts marked ${cat[0]}`], paths: [] };
+  }
+
+  // 0d. "Who did I talk to recently?": the latest notes across everyone.
+  if (mentioned.length === 0 && /\b(recent(ly)?|lately|latest|last (few|week|month))\b/i.test(question) && /\b(talk|talked|spoke|spoken|met|meet|conversations?|interactions?|notes?|chat|caught up|saw)\b/i.test(question)) {
+    const notes = [...network.interactions].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
+    return notes.length
+      ? {
+          answer: `Your most recent conversations:\n${notes.map((i) => `• ${nameById.get(i.contactId) ?? "Someone"}, ${formatDay(i.date)} (${i.kind}): "${i.summary.length > 90 ? `${i.summary.slice(0, 90)}…` : i.summary}"`).join("\n")}`,
+          referencedContactIds: [...new Set(notes.map((i) => i.contactId).filter((id) => nameById.has(id)))],
+          gaps: [],
+          paths: [],
+          noteIds: notes.map((i) => i.id),
+        }
+      : { answer: "You haven't logged any conversations yet. Add one in Memory.", referencedContactIds: [], gaps: ["logged conversations"], paths: [] };
+  }
+
+  // 0e. "Who works in law?" / "Who's in the tech industry?": work fields only.
+  const field = /\b(?:works?|working|is|are) (?:in|at|for)\s+(?:the\s+)?([a-z][a-z &'-]{1,40}?)(?:\s+(?:industry|field|sector|space|world))?\s*\??$/i.exec(question) ??
+    /\bin (?:the\s+)?([a-z][a-z &'-]{1,40}?)\s+(?:industry|field|sector|space|world)\b/i.exec(question);
+  if (field && mentioned.length === 0) {
+    const hits = fieldHits(field[1], network.contacts);
+    if (hits.length) {
+      return {
+        answer: `${hits.length} ${hits.length === 1 ? "person's" : "people's"} recorded work matches "${field[1]}":\n${hits.map((c) => `• ${describe(c)}`).join("\n")}`,
+        referencedContactIds: hits.map((c) => c.id),
+        gaps: [],
+        paths: [],
+      };
+    }
+  }
 
   // 1. Path questions: the answer is the BFS result from the map, nothing else.
   if (ctx.pathFacts.length > 0) {
@@ -116,6 +254,8 @@ export function answerQuestion(question: string, network: NetworkPayload): Answe
     if (c.goals.length) parts.push(`Recorded goals: ${list(c.goals)}.`);
     if (c.interests.length) parts.push(`Interests: ${list(c.interests)}.`);
     if (!isLastTalkQuestion(question) && c.notes) parts.push(`Your notes: ${c.notes}`);
+    const open = reminders.filter((r) => r.contactId === c.id);
+    if (open.length) parts.push(`Open follow-ups: ${open.map((r) => (r.dueDate ? `${r.title} (${formatDay(r.dueDate)})` : r.title)).join("; ")}.`);
     return { answer: parts.join("\n"), referencedContactIds: [c.id], gaps, paths: [], noteIds: notes.slice(0, 1).map((n) => n.id) };
   }
 
@@ -127,6 +267,15 @@ export function answerQuestion(question: string, network: NetworkPayload): Answe
       const loc = tokens(c.location ?? "");
       return want.length > 0 && want.every((w) => loc.includes(w));
     });
+    const work = hits.length ? [] : fieldHits(place, network.contacts);
+    if (work.length) {
+      return {
+        answer: `Nobody's recorded location matches "${place}", but ${work.length} ${work.length === 1 ? "person's" : "people's"} work does:\n${work.map((c) => `• ${describe(c)}`).join("\n")}`,
+        referencedContactIds: work.map((c) => c.id),
+        gaps: [],
+        paths: [],
+      };
+    }
     return hits.length
       ? {
           answer: `You've recorded ${hits.length} ${hits.length === 1 ? "person" : "people"} in ${place}:\n${hits.map((c) => `• ${describe(c)}`).join("\n")}`,
@@ -155,8 +304,7 @@ export function answerQuestion(question: string, network: NetworkPayload): Answe
     .slice(0, 3);
   if (scored.length === 0 && noteHits.length === 0) {
     return {
-      answer:
-        "I couldn't find anything in your records that matches. Try a person's name, a city (\"Who do I know in Toronto?\"), or a topic like \"AI policy\".",
+      answer: `I couldn't find anything in your records that matches, and I only answer from what you've saved. ${capabilityText()}`,
       referencedContactIds: [],
       gaps: ["records matching your question"],
       paths: [],
@@ -195,6 +343,7 @@ function headlineFor(c: Candidate, a: PayloadContact, b: PayloadContact) {
     return `${helper.name.split(" ")[0]} might help with ${seeker.name.split(" ")[0]}'s goal`;
   }
   const shared = c.evidence.filter((e) => e.kind === "shared_interest").length;
+  if (!shared && c.evidence.some((e) => e.kind === "same_field")) return "Same field of work";
   return shared > 1 ? "Several shared interests" : "A shared interest";
 }
 
@@ -209,6 +358,8 @@ export function suggestIntroductions(network: NetworkPayload, limit = 8): Sugges
     const reasons = [
       kinds.has("goal_match") && "one person's recorded goal lines up with the other's work or skills",
       kinds.has("shared_interest") && "they list the same interest",
+      kinds.has("same_field") && "they work in the same field",
+      kinds.has("mutual_connection") && "you've recorded someone who knows them both",
       kinds.has("same_location") && "they're recorded in the same city",
     ].filter(Boolean) as string[];
     return {

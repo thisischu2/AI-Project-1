@@ -3,7 +3,7 @@ import { buildDemoNetwork, emptyNetwork } from "./demo-data";
 import { backupFileName, makeBackup, mergeNetworks, normalizeNetwork, parseSaved, readBackup } from "./persistence";
 import type { NetworkData } from "./types";
 
-const demo = () => buildDemoNetwork("Chu");
+const demo = () => buildDemoNetwork("Sam");
 
 describe("parseSaved: never discards silently", () => {
   it("treats nothing saved as empty", () => {
@@ -88,16 +88,16 @@ describe("mergeNetworks: combine never deletes", () => {
   });
 
   it("adds what is new on either side", () => {
-    const phone = withContact(emptyNetwork("Chu"), "c-phone", "Ana", "2026-11-01");
-    const laptop = withContact(emptyNetwork("Chu"), "c-laptop", "Ben", "2026-11-02");
+    const phone = withContact(emptyNetwork("Sam"), "c-phone", "Ana", "2026-11-01");
+    const laptop = withContact(emptyNetwork("Sam"), "c-laptop", "Ben", "2026-11-02");
     const { data, summary } = mergeNetworks(phone, laptop);
     expect(data.contacts.map((c) => c.name).sort()).toEqual(["Ana", "Ben"]);
     expect(summary.added.contacts).toBe(1);
   });
 
   it("keeps the most recently edited copy of the same person", () => {
-    const older = withContact(emptyNetwork("Chu"), "c1", "Ana (old)", "2026-11-01T10:00:00Z");
-    const newer = withContact(emptyNetwork("Chu"), "c1", "Ana (new)", "2026-11-05T10:00:00Z");
+    const older = withContact(emptyNetwork("Sam"), "c1", "Ana (old)", "2026-11-01T10:00:00Z");
+    const newer = withContact(emptyNetwork("Sam"), "c1", "Ana (new)", "2026-11-05T10:00:00Z");
     expect(mergeNetworks(older, newer).data.contacts[0].name).toBe("Ana (new)");
     expect(mergeNetworks(newer, older).data.contacts[0].name).toBe("Ana (new)");
   });

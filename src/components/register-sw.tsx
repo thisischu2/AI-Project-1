@@ -6,7 +6,9 @@ import { useEffect } from "react";
 export function RegisterServiceWorker() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
-    navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" }).catch(() => {
+    // On GitHub Pages the site lives under /<repo>/, so the worker does too.
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    navigator.serviceWorker.register(`${base}/sw.js`, { scope: `${base}/`, updateViaCache: "none" }).catch(() => {
       // Offline support is a bonus; the app still works online without it.
     });
   }, []);

@@ -38,7 +38,7 @@ describe("matching rules", () => {
     expect(compareContacts({ name: "Ana" }, { name: "ana" })?.confidence).toBe("medium");
   });
   it("finds no duplicates in the demo network, and respects dismissals", () => {
-    const d = buildDemoNetwork("Chu");
+    const d = buildDemoNetwork("Sam");
     expect(findDuplicatePairs(d.contacts)).toEqual([]);
     const cs = [person("a", "Bob Smith"), person("b", "Robert Smith")];
     expect(findDuplicatePairs(cs)).toHaveLength(1);
@@ -48,7 +48,7 @@ describe("matching rules", () => {
 
 describe("mergeContacts", () => {
   it("moves history and connections to the kept person without duplicates", () => {
-    const d = buildDemoNetwork("Chu");
+    const d = buildDemoNetwork("Sam");
     const marcus = d.contacts.find((c) => c.name === "Marcus Reed")!;
     const copy = person("dup", "Marcus Reed", { email: "marcus@example.com", interests: ["Jazz", "chess"] });
     const before = {
@@ -70,7 +70,7 @@ describe("mergeContacts", () => {
     expect(after.interactions.find((i) => i.id === "ix")!.contactId).toBe(marcus.id);
   });
   it("does nothing for unknown or identical ids", () => {
-    const d = buildDemoNetwork("Chu");
+    const d = buildDemoNetwork("Sam");
     expect(mergeContacts(d, "nope", d.contacts[0].id)).toBe(d);
     expect(mergeContacts(d, d.contacts[0].id, d.contacts[0].id)).toBe(d);
   });

@@ -10,12 +10,12 @@
 
 | Tab | What you can do | How it works |
 | --- | --- | --- |
-| **Home** | Network stats, map preview, follow-ups and upcoming dates, recent contacts and memories, possible introductions, a search bar | Plain code |
-| **My Circle** | Add someone by describing them in your own words ("Met Sarah Lee at the ABA conference, associate at Davis Polk…"): the form is filled from your wording, each value shows the words it came from, possible duplicates are flagged, and nothing is saved until you press Save. Edit, search, filter and delete contacts; multiple categories; important dates; timeline; follow-ups; record who knows whom | Plain code |
+| **Home** | **Today:** overdue follow-ups, what's due today and in the next 7 days (tick them off right there), and birthdays and other important dates in the next 30 days. Below that, network stats, map preview, recent contacts and memories, possible introductions, a search bar | Plain code (date arithmetic) |
+| **My Circle** | Add someone by describing them in your own words ("Met Sarah Lee at the ABA conference, associate at Hartwell Lane…"): the form is filled from your wording, each value shows the words it came from, possible duplicates are flagged, and nothing is saved until you press Save. Edit, search, filter and delete contacts; multiple categories; important dates; timeline; follow-ups; record who knows whom | Plain code |
 | **The Map** | Interactive map (pinch, drag, tap), category filters, shortest known path with highlighting, "no recorded path" handling | Breadth-first search |
 | **Memory** | Jot down a conversation: who, how, when. If your note names a saved person, they're picked for you. Promises in your wording ("I'll send her my outline by Friday", "she said she'd send me the list next week") are offered as follow-ups, linked to the note, and saved only if you tick them. Search every note, with matches highlighted. Each profile has an "At a glance" summary where every line links to the notes it came from | Plain code (name matching, wording rules) |
 | **Discover** | **Your goals:** save what you're working toward; for each goal, people whose recorded job, skills, interests or your notes match it, with the reasons and how you reach them (direct, or via whom). Draft a message, or ask the person in between for an introduction; dismiss matches that aren't relevant. Same city alone never counts. Below that, possible introductions with the recorded evidence for each, plus a consent-gated introduction template you send yourself | Keyword matching on recorded interests, goals and skills |
-| **Ask 6ix** | Ask about your own network: paths ("How am I connected to James?"), people ("What did I last discuss with Marcus?"), places ("Who do I know in Toronto?") or topics. People and source notes in each answer are tappable. Ask for actions: "Draft a message to Priya", "Write an intro for Priya and Leo", "Remind me to call Marcus on Friday". Drafts use only saved facts and list them; you copy them or open them in your email or text app. Follow-ups are saved only when you tap Save | Rule-based search and wording rules over your records |
+| **Ask 6ix** | Ask about your own network: paths ("How am I connected to James?"), people ("What did I last discuss with Marcus?"), places ("Who do I know in Toronto?"), fields of work ("Who works in policy?"), relationship categories ("Who are my mentors?"), follow-ups ("What's due this week?", "What's overdue?"), recent conversations, recorded connections ("Who does Marcus know?") or topics. A question it can't answer gets a list of what it can. People and source notes in each answer are tappable. Ask for actions: "Draft a message to Priya", "Write an intro for Priya and Leo", "Remind me to call Marcus on Friday". Drafts use only saved facts and list them; you copy them or open them in your email or text app. Follow-ups are saved only when you tap Save | Rule-based search and wording rules over your records |
 
 ## Phone app features (Project 2 checklist)
 
@@ -46,7 +46,7 @@ npm run dev
 
 Open http://localhost:3000. Click **Explore demo network**, then try **The Map → You → James Whitfield** to see "3 degrees of separation".
 
-Offline support only switches on in the production build: run `npm run build && npm start` to try it.
+Offline support only switches on in the production build: run `npm run build && npm start` to try it (it serves the static files in `out/`).
 
 ### Useful commands
 
@@ -56,7 +56,28 @@ Offline support only switches on in the production build: run `npm run build && 
 | `npm test` | Run the automated tests (graph, search, Discover, reminders) |
 | `npm run lint` | Check code style |
 | `npm run typecheck` | Check TypeScript types |
-| `npm run build` | Make a production build (what Vercel runs) |
+| `npm run build` | Make the static site in `out/` (what GitHub Pages serves) |
+| `npm start` | Serve `out/` at http://localhost:3000 |
+
+## Project 2 compliance
+
+| Requirement | How it's met |
+| --- | --- |
+| No AI model calls | Ask 6ix, Memory, Discover and contact capture are plain rules in `src/lib/`. No AI SDK, no API routes. |
+| No passwords or API keys | There is no server, no sign-in and nothing to configure. |
+| Data stays on the phone | Everything is saved in the browser's local storage (`6ix-degrees:network:v1`). Backup files are made and read on the device. |
+| Installable | Web app manifest, icons and a service worker; tested on a phone-sized browser (see the test log). |
+| Published on GitHub Pages | `.github/workflows/pages.yml` builds a static site and deploys it on every push to `main`. |
+| Works on a phone | Bottom tab bar, 44px tap targets, 16px inputs, no sideways scrolling. |
+| Qualifying functions | Saves data between uses, works offline, calculates degrees of separation and follow-up dates, local backup and import. |
+
+Demo people are fictional and marked "Demo" everywhere. Real contacts never leave the phone and are never committed to the repository.
+
+### Publish on GitHub Pages
+
+1. In the repository on GitHub, open **Settings → Pages** and set **Source** to **GitHub Actions** (one time only).
+2. Push to `main`. The **Deploy to GitHub Pages** workflow runs lint, type checks and tests, builds the site with `BASE_PATH=/AI-Project-1`, and publishes it.
+3. The app is at **https://thisischu2.github.io/AI-Project-1/**. Open that address on a phone to install it.
 
 ## How it is built
 
@@ -66,7 +87,6 @@ The key design rule: **facts are computed by code from what you recorded.** Degr
 
 ## Roadmap
 
-- **Phase 2 — Accounts and cloud storage:** Supabase Auth + Postgres using the included migration, replacing `src/lib/store.tsx`.
-- **Phase 3 — Deploy:** Vercel (no environment variables needed).
+- **Not planned for Project 2 — accounts and cloud storage.** They would need keys and a network service. An unused early design is archived in `docs/archive/supabase-not-used/`.
 - **Phase 4 — Polish:** follow-up suggestions, smarter search wording (synonyms), more evaluation scenarios.
 - Deferred until after MVP: voice, email/calendar sync, notifications, social integrations, shared graphs, native mobile apps.

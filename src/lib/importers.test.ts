@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildDemoNetwork } from "./demo-data";
 import { classifyRows, guessColumnMap, parseBirthday, parseCSV, parseVCards, planImport, rowsToCandidates, splitHeader, toContactInput } from "./importers";
 
-const demo = buildDemoNetwork("Chu").contacts;
+const demo = buildDemoNetwork("Sam").contacts;
 
 describe("parseCSV", () => {
   it("handles quotes, embedded commas, newlines, escaped quotes, CRLF and BOM", () => {

@@ -10,21 +10,21 @@ const saved = [
 describe("extractContact", () => {
   it("reads a full description, keeping the words each value came from", () => {
     const r = extractContact(
-      "Met Sarah Lee at the ABA tech conference. She's an associate at Davis Polk in New York, really into legal tech and climate policy. Wants to move in-house. sarah.lee@dpw.com, (212) 555-0182. Introduced by Marcus.",
+      "Met Sarah Lee at the ABA tech conference. She's an associate at Hartwell Lane in New York, really into legal tech and climate policy. Wants to move in-house. sarah.lee@example.com, (212) 555-0182. Introduced by Marcus.",
       saved,
     );
     expect(r.contact).toMatchObject({
       name: "Sarah Lee",
       occupation: "associate",
-      organization: "Davis Polk",
+      organization: "Hartwell Lane",
       location: "New York",
-      email: "sarah.lee@dpw.com",
+      email: "sarah.lee@example.com",
       phone: "(212) 555-0182",
       metContext: "At the ABA tech conference",
       interests: ["legal tech", "climate policy"],
       goals: ["move in-house"],
     });
-    expect(r.found.find((f) => f.field === "organization")?.from).toBe("She's an associate at Davis Polk in New York");
+    expect(r.found.find((f) => f.field === "organization")?.from).toBe("She's an associate at Hartwell Lane in New York");
     expect(r.introducer).toEqual({ name: "Marcus", from: "Introduced by Marcus", kind: "introduced", matches: [{ id: "c1", name: "Marcus Reed" }] });
     // The person's own words are kept as the contact's notes.
     expect(r.contact.notes).toMatch(/^Met Sarah Lee/);

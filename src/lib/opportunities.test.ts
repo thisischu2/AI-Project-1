@@ -4,7 +4,7 @@ import { draftAsk, findOpportunities, goalWords, opportunityKey } from "./opport
 import { mergeNetworks, normalizeNetwork } from "./persistence";
 import { NetworkPayloadSchema } from "./validation";
 
-const network = NetworkPayloadSchema.parse({ profileName: "Chu", contacts: demoContacts, connections: demoConnections, interactions: demoInteractions });
+const network = NetworkPayloadSchema.parse({ profileName: "Sam", contacts: demoContacts, connections: demoConnections, interactions: demoInteractions });
 
 describe("goal words", () => {
   it("drops filler words and folds word forms", () => {
@@ -71,7 +71,7 @@ describe("draftAsk", () => {
     expect(d.to).toBe("demo-marcus");
     expect(d.body).toMatch(/^Hi Marcus,/);
     expect(d.body).toContain("you're a Product Designer at Northline Studio");
-    expect(d.body).toMatch(/Thanks,\nChu$/);
+    expect(d.body).toMatch(/Thanks,\nSam$/);
   });
 
   it("asks the person in between for an introduction to a 2° contact", () => {
@@ -87,7 +87,7 @@ describe("saving goals", () => {
   it("keeps goals and dismissals through a reload and combines them across devices", () => {
     const base = normalizeNetwork({
       version: 1,
-      profile: { name: "Chu", priorities: ["find a mentor"] },
+      profile: { name: "Sam", priorities: ["find a mentor"] },
       contacts: [],
       connections: [],
       interactions: [],
@@ -96,7 +96,7 @@ describe("saving goals", () => {
     })!.data;
     expect(base.profile.priorities).toEqual(["find a mentor"]);
     expect(base.dismissedOpportunities).toEqual(["find a mentor|c1"]);
-    const other = { ...base, profile: { name: "Chu", priorities: ["Find a mentor", "learn piano"] }, dismissedOpportunities: ["learn piano|c2"] };
+    const other = { ...base, profile: { name: "Sam", priorities: ["Find a mentor", "learn piano"] }, dismissedOpportunities: ["learn piano|c2"] };
     const merged = mergeNetworks(base, other).data;
     expect(merged.profile.priorities).toEqual(["Find a mentor", "learn piano"]);
     expect(merged.dismissedOpportunities).toEqual(["find a mentor|c1", "learn piano|c2"]);

@@ -41,7 +41,7 @@ No server code, no AI service, no secret keys.
 | `src/app/manifest.ts`, `public/sw.js` | Home-screen install and offline support |
 | `src/lib/demo-data.ts` | Fictional demo network (every person flagged `isDemo`) |
 | `src/components/` | Shared UI: app shell, map, profile, forms, primitives |
-| `supabase/migrations/` | Phase 2 database schema with Row Level Security |
+| `docs/archive/supabase-not-used/` | Unused early design for cloud sync, kept as a record. The app does not use it |
 
 ## Safeguards
 
@@ -51,9 +51,6 @@ No server code, no AI service, no secret keys.
 - Introduction drafts require a consent checkbox, list which details they share, and are never sent by the app.
 - Demo people are fictional and labeled.
 
-## Moving to Supabase (Phase 2)
+## Cloud sync (not used)
 
-1. Create a Supabase project and run `supabase/migrations/0001_initial_schema.sql`.
-2. Add the Supabase project URL and public key to `.env.local`. (This would bring back keys and a network connection, so it is out of scope for Project 2.)
-3. Add sign-in pages with Supabase Auth.
-4. Replace the localStorage calls in `src/lib/store.tsx` with Supabase queries.
+There is no cloud database. An early Supabase design is kept in `docs/archive/supabase-not-used/` as a record only; using it would need keys and a network connection, which Project 2 rules out.

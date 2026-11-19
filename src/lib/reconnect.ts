@@ -64,3 +64,26 @@ export function relativeDay(days?: number) {
   if (days === 1) return "Tomorrow";
   return `In ${days} days`;
 }
+
+export interface TodayView {
+  overdue: UpcomingItem[];
+  dueToday: UpcomingItem[];
+  thisWeek: UpcomingItem[];
+  /** Open follow-ups with no date. */
+  undated: UpcomingItem[];
+  /** Birthdays and other dates in the next 30 days. */
+  dates: UpcomingItem[];
+}
+
+/** Home's "Today": follow-ups grouped by when they're due, plus upcoming important dates. */
+export function todayView(contacts: Contact[], reminders: Reminder[], todayISO: string): TodayView {
+  const all = upcoming(contacts, reminders, todayISO, 30);
+  const rem = all.filter((i) => i.kind === "reminder");
+  return {
+    overdue: rem.filter((i) => i.daysAway !== undefined && i.daysAway < 0),
+    dueToday: rem.filter((i) => i.daysAway === 0),
+    thisWeek: rem.filter((i) => i.daysAway !== undefined && i.daysAway >= 1 && i.daysAway <= 7),
+    undated: rem.filter((i) => i.daysAway === undefined),
+    dates: all.filter((i) => i.kind === "date"),
+  };
+}
