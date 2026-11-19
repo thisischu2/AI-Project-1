@@ -1,11 +1,12 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, ArrowUp, BellPlus, Check, Copy, FileText, Info, Mail, MessageSquare, PenLine, UserRound } from "lucide-react";
+import { ArrowRight, ArrowUp, BellPlus, Check, FileText, Info, PenLine, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ContactProfile } from "@/components/contact-profile";
+import { MessageDraft } from "@/components/message-draft";
 import { LogoMark } from "@/components/logo";
-import { Avatar, Badge, Button, Card, Label, PageHeader, Sheet, Textarea, cn, inputClass } from "@/components/ui";
+import { Avatar, Badge, Button, Card, PageHeader, Sheet, cn, inputClass } from "@/components/ui";
 import { formatDate, toPayload, todayISO } from "@/lib/api";
 import { askWithActions, type ActionAnswer, type AskAction } from "@/lib/actions";
 import { degreeLabel } from "@/lib/graph";
@@ -222,7 +223,15 @@ export default function AskPage() {
         {profile && <ContactProfile key={profile.id + (profile.note ?? "")} id={profile.id} focusNoteId={profile.note} onDeleted={() => setProfile(null)} />}
       </Sheet>
       <Sheet open={!!drafting} onClose={() => setDrafting(null)} title={drafting && drafting.contactIds.length > 1 ? "Introduction draft" : "Message draft"}>
-        {drafting && <DraftPanel key={drafting.draft.body} action={drafting} />}
+        {drafting && (
+          <MessageDraft
+            key={drafting.draft.body}
+            contactIds={drafting.contactIds}
+            subject={drafting.draft.subject}
+            body={drafting.draft.body}
+            basedOn={drafting.draft.basedOn}
+          />
+        )}
       </Sheet>
     </>
   );
@@ -269,66 +278,6 @@ function ReminderCard({ action, name, collapsed }: { action: Extract<AskAction, 
           <Check size={14} /> Save follow-up
         </Button>
       </div>
-    </div>
-  );
-}
-
-/** An editable draft. Copy it, or open it in the phone's email or text app; the person sends it themselves. */
-function DraftPanel({ action }: { action: DraftAction }) {
-  const { contactById } = useNetwork();
-  const [body, setBody] = useState(action.draft.body);
-  const [copied, setCopied] = useState(false);
-  const people = action.contactIds.map((id) => contactById(id)).filter(Boolean);
-  const emails = people.map((c) => c!.email).filter(Boolean) as string[];
-  const phone = people.length === 1 ? people[0]!.phone : undefined;
-  const subject = action.draft.subject;
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-silver">Written from your records. Change anything you like. Nothing is sent from here.</p>
-      {action.draft.basedOn.length > 0 && (
-        <div className="rounded-xl bg-white/[0.03] p-3 text-xs text-silver">
-          <p className="mb-1 font-medium text-platinum">Based on</p>
-          <ul className="list-disc space-y-0.5 pl-4">
-            {action.draft.basedOn.map((b) => (
-              <li key={b}>{b}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <div>
-        <Label htmlFor="draft-body">Message</Label>
-        <Textarea id="draft-body" className="min-h-64" value={body} onChange={(e) => setBody(e.target.value)} />
-      </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-        <Button
-          variant="primary"
-          onClick={async () => {
-            try {
-              await navigator.clipboard.writeText(body);
-              setCopied(true);
-            } catch {
-              setCopied(false);
-            }
-          }}
-        >
-          <Copy size={14} /> {copied ? "Copied" : "Copy"}
-        </Button>
-        {emails.length > 0 && (
-          <a href={`mailto:${emails.join(",")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}>
-            <Button className="w-full">
-              <Mail size={14} /> Open in email app
-            </Button>
-          </a>
-        )}
-        {phone && (
-          <a href={`sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(body)}`}>
-            <Button className="w-full">
-              <MessageSquare size={14} /> Open in messages
-            </Button>
-          </a>
-        )}
-      </div>
-      {emails.length === 0 && !phone && <p className="text-xs text-silver">No email or phone saved for {people.length > 1 ? "them" : people[0]?.name}, so copy the text instead.</p>}
     </div>
   );
 }

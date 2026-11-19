@@ -197,7 +197,7 @@ export const demoReminders: Reminder[] = [
 export function buildDemoNetwork(userName: string): NetworkData {
   return {
     version: 1,
-    profile: { name: userName || "You", priorities: ["career growth", "staying close to friends"] },
+    profile: { name: userName || "You", priorities: ["find a summer role in tech policy", "staying close to friends"] },
     contacts: demoContacts,
     connections: demoConnections,
     interactions: demoInteractions,
