@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowRight, Brain, Network, ShieldCheck, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { ArrowRight, Brain, FileUp, Network, ShieldCheck, Sparkles } from "lucide-react";
+import { useRef, useState } from "react";
+import { MAX_BACKUP_BYTES, readBackup } from "@/lib/persistence";
 import { useNetwork } from "@/lib/store";
 import { LogoMark } from "./logo";
 import { Button, Input } from "./ui";
@@ -15,8 +16,25 @@ const pillars = [
 
 /** First-run landing + onboarding. Shown until the user picks a starting point. */
 export function Onboarding() {
-  const { startFresh, loadDemo } = useNetwork();
+  const { startFresh, loadDemo, replaceAll } = useNetwork();
   const [name, setName] = useState("");
+  const [restoreError, setRestoreError] = useState("");
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  // Moving from another device: load its backup file instead of starting over.
+  const restore = async (file: File | undefined) => {
+    setRestoreError("");
+    if (!file) return;
+    if (file.size > MAX_BACKUP_BYTES) return setRestoreError("That file is too large to be a 6IX backup.");
+    try {
+      const r = readBackup(await file.text());
+      if (r.ok) replaceAll(r.data);
+      else setRestoreError(r.error);
+    } catch {
+      setRestoreError("Couldn't read that file. Try choosing it again.");
+    }
+    if (fileInput.current) fileInput.current.value = "";
+  };
 
   return (
     <div className="app-glow relative min-h-screen overflow-hidden">
@@ -78,6 +96,24 @@ export function Onboarding() {
             <ShieldCheck size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             The demo uses clearly labeled fictional people. You can remove them anytime.
           </p>
+          <div className="mt-4 border-t border-white/5 pt-4">
+            <input
+              ref={fileInput}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              aria-label="Choose a backup file"
+              onChange={(e) => restore(e.target.files?.[0])}
+            />
+            <Button type="button" variant="ghost" className="w-full" onClick={() => fileInput.current?.click()}>
+              <FileUp size={15} /> Already use 6IX on another device? Load your backup
+            </Button>
+            {restoreError && (
+              <p role="alert" className="mt-2 text-sm text-red-300">
+                {restoreError}
+              </p>
+            )}
+          </div>
         </motion.form>
 
         <div className="mt-14 grid w-full gap-4 sm:grid-cols-3">

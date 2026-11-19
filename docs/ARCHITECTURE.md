@@ -30,6 +30,8 @@ No server code, no AI service, no secret keys.
 | `src/lib/assistant.ts` | Ask 6ix answers, Discover wording, and intro templates, all rule-based |
 | `src/lib/reconnect.ts` | Upcoming follow-ups and dates (birthdays repeat yearly) |
 | `src/lib/validation.ts` | The shape of a saved network, with defaults for older data |
+| `src/lib/persistence.ts` | Checks saved data on load (repairs, never silently discards), backup files, combining two networks |
+| `src/app/data/page.tsx` | Backup & your data: save, load (combine or replace), recovered copy, delete all |
 | `src/app/manifest.ts`, `public/sw.js` | Home-screen install and offline support |
 | `src/lib/demo-data.ts` | Fictional demo network (every person flagged `isDemo`) |
 | `src/components/` | Shared UI: app shell, map, profile, forms, primitives |
