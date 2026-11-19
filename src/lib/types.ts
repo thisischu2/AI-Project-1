@@ -108,6 +108,8 @@ export interface NetworkData {
   interactions: Interaction[];
   reminders: Reminder[];
   onboarded: boolean;
+  /** Pairs ("idA|idB") the person marked as different people, so they aren't flagged again. */
+  dismissedDuplicates?: string[];
 }
 
 export const ME = "me";

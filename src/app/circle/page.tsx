@@ -1,11 +1,13 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Plus, Search, Users } from "lucide-react";
+import { Copy, FileUp, Plus, Search, Users } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { blankContact, ContactForm } from "@/components/contact-form";
 import { ContactProfile } from "@/components/contact-profile";
 import { Avatar, Badge, Button, Card, DemoBadge, EmptyState, Input, PageHeader, Sheet, cn } from "@/components/ui";
+import { findDuplicatePairs, type DuplicatePair } from "@/lib/duplicates";
 import { distancesFrom } from "@/lib/graph";
 import { useNetwork } from "@/lib/store";
 import { CATEGORIES, ME, type Category } from "@/lib/types";
@@ -17,6 +19,8 @@ export default function CirclePage() {
   const [category, setCategory] = useState<Category | "all">("all");
   const [selected, setSelected] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const duplicatePairs = useMemo(() => findDuplicatePairs(data.contacts, data.dismissedDuplicates), [data.contacts, data.dismissedDuplicates]);
 
   const distances = useMemo(() => distancesFrom(data.connections, ME), [data.connections]);
   const filtered = useMemo(() => {
@@ -39,11 +43,31 @@ export default function CirclePage() {
         title="My Circle"
         subtitle={`${data.contacts.length} ${data.contacts.length === 1 ? "person" : "people"} in your network`}
         action={
-          <Button variant="primary" onClick={() => setCreating(true)}>
-            <Plus size={16} /> Add contact
-          </Button>
+          <div className="flex gap-2">
+            <Link href="/import">
+              <Button>
+                <FileUp size={15} /> Import
+              </Button>
+            </Link>
+            <Button variant="primary" onClick={() => setCreating(true)}>
+              <Plus size={16} /> Add contact
+            </Button>
+          </div>
         }
       />
+
+      {duplicatePairs.length > 0 && (
+        <button
+          onClick={() => setReviewing(true)}
+          className="mb-5 flex w-full items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-left text-sm text-amber-100/90 transition hover:bg-amber-500/10"
+        >
+          <Copy size={16} className="shrink-0" />
+          <span className="flex-1">
+            {duplicatePairs.length === 1 ? "1 possible duplicate" : `${duplicatePairs.length} possible duplicates`} in your circle.
+          </span>
+          <span className="font-medium underline underline-offset-2">Review</span>
+        </button>
+      )}
 
       <div className="mb-6 flex flex-col gap-3">
         <div className="relative">
@@ -139,6 +163,11 @@ export default function CirclePage() {
       <Sheet open={creating} onClose={() => setCreating(false)} title="New contact">
         <ContactForm
           initial={blankContact()}
+          existing={data.contacts}
+          onOpenExisting={(id) => {
+            setCreating(false);
+            setSelected(id);
+          }}
           onCancel={() => setCreating(false)}
           onSubmit={(v) => {
             const c = store.addContact(v);
@@ -147,6 +176,76 @@ export default function CirclePage() {
           }}
         />
       </Sheet>
+      <Sheet open={reviewing} onClose={() => setReviewing(false)} title="Possible duplicates" wide>
+        <DuplicateReview pairs={duplicatePairs} onDone={() => setReviewing(false)} />
+      </Sheet>
     </>
+  );
+}
+
+function DuplicateReview({ pairs, onDone }: { pairs: DuplicatePair[]; onDone: () => void }) {
+  const store = useNetwork();
+  const [message, setMessage] = useState("");
+  const counts = (id: string) => ({
+    notes: store.data.interactions.filter((i) => i.contactId === id).length,
+    links: store.data.connections.filter((e) => e.sourceId === id || e.targetId === id).length,
+  });
+
+  if (pairs.length === 0) {
+    return (
+      <div className="space-y-4">
+        {message && <p className="text-sm text-emerald-300">{message}</p>}
+        <EmptyState icon={<Users size={20} />} title="No possible duplicates" body="Everyone in your circle looks like a different person." />
+        <Button onClick={onDone}>Close</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-silver">
+        Matched by plain rules (same email, phone or name, or a common nickname). Merging keeps one record, fills in its blanks from the other, and moves notes,
+        follow-ups and connections over. You decide each one.
+      </p>
+      {message && (
+        <p role="status" className="text-sm text-emerald-300">
+          {message}
+        </p>
+      )}
+      {pairs.map(({ a, b, confidence, reasons }) => (
+        <Card key={a.id + b.id} className="space-y-3 p-4">
+          <Badge tone={confidence === "high" ? "amber" : "neutral"}>{confidence === "high" ? "Very likely the same person" : "Possibly the same person"}</Badge>
+          <p className="text-xs text-silver">{reasons.join(" · ")}</p>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {[a, b].map((c) => {
+              const n = counts(c.id);
+              return (
+                <div key={c.id} className="rounded-xl bg-white/[0.03] p-3 text-sm">
+                  <p className="font-medium">{c.name}</p>
+                  <p className="text-xs text-silver">{[c.occupation, c.organization, c.email, c.phone].filter(Boolean).join(" · ") || "No details"}</p>
+                  <p className="mt-1 text-xs text-silver">
+                    {n.notes} notes · {n.links} connections · edited {c.updatedAt.slice(0, 10)}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    className="mt-2 w-full"
+                    onClick={() => {
+                      store.mergeContactInto(c.id, c.id === a.id ? b.id : a.id);
+                      setMessage(`Merged. ${c.name} now has both records' details and history.`);
+                    }}
+                  >
+                    Keep this one and merge
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => (store.dismissDuplicate(a.id, b.id), setMessage("Marked as different people."))}>
+            These are different people
+          </Button>
+        </Card>
+      ))}
+    </div>
   );
 }

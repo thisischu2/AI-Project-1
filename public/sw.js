@@ -7,8 +7,8 @@
  * - Pages: try the network first (so updates arrive), fall back to the cache.
  * - Built files under /_next/static: cache first (their names change on update).
  */
-const VERSION = "6ix-v2";
-const PAGES = ["/", "/circle", "/map", "/memory", "/discover", "/ask", "/data"];
+const VERSION = "6ix-v3";
+const PAGES = ["/", "/circle", "/map", "/memory", "/discover", "/ask", "/data", "/import"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

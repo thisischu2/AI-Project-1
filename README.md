@@ -24,6 +24,7 @@
 - **Works with no internet connection.** `public/sw.js` keeps a copy of every page; your data is already on the phone.
 - **Calculates results from your inputs.** Degrees of separation, reminder countdowns, and Discover matches.
 - **Backup and move between devices.** The Backup page (top-right on a phone) saves one file you can AirDrop, email or save to Drive, and loads it on another device: combine with what's there, or replace it. A new device can load a backup straight from the welcome screen.
+- **Import and tidy up contacts.** My Circle → Import reads CSV (Google, Outlook, LinkedIn, spreadsheets) and vCard (.vcf) files on the device, lets you fix the column matching, and shows every row as new, possible duplicate or skipped before saving. Possible duplicates in your circle are flagged with the reason and can be merged.
 - **No AI service and no keys.** There is no server code and nothing to configure.
 
 ### Install it on your phone
