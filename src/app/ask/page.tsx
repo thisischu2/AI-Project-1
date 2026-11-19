@@ -1,28 +1,34 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, ArrowUp, Info } from "lucide-react";
+import { ArrowRight, ArrowUp, BellPlus, Check, Copy, FileText, Info, Mail, MessageSquare, PenLine, UserRound } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { ContactProfile } from "@/components/contact-profile";
 import { LogoMark } from "@/components/logo";
-import { Avatar, Badge, Button, Card, PageHeader } from "@/components/ui";
-import { toPayload } from "@/lib/api";
-import { answerQuestion, type Answer } from "@/lib/assistant";
+import { Avatar, Badge, Button, Card, Label, PageHeader, Sheet, Textarea, cn, inputClass } from "@/components/ui";
+import { formatDate, toPayload, todayISO } from "@/lib/api";
+import { askWithActions, type ActionAnswer, type AskAction } from "@/lib/actions";
 import { degreeLabel } from "@/lib/graph";
 import { useNetwork } from "@/lib/store";
 
 import type { NetworkPayload } from "@/lib/validation";
 
-type Turn = { q: string; a: Answer };
+type Turn = { q: string; a: ActionAnswer };
+type DraftAction = Extract<AskAction, { type: "draft" }>;
 
 const EXAMPLES = [
   "Who do I know in New York?",
   "What did I last discuss with Marcus?",
   "How am I connected to James?",
   "Who might benefit from an introduction?",
+  "Draft a message to Priya",
+  "Remind me to call Marcus on Friday",
 ];
 
 export default function AskPage() {
-  const { data, nameOf } = useNetwork();
+  const { data, nameOf, contactById } = useNetwork();
+  const [profile, setProfile] = useState<{ id: string; note?: string } | null>(null);
+  const [drafting, setDrafting] = useState<DraftAction | null>(null);
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<Turn[]>([]);
   const bottom = useRef<HTMLDivElement>(null);
@@ -33,7 +39,7 @@ export default function AskPage() {
     const q = question.trim();
     if (!q) return;
     setInput("");
-    setTurns((t) => [...t, { q, a: answerQuestion(q, toPayload(data) as NetworkPayload) }]);
+    setTurns((t) => [...t, { q, a: askWithActions(q, toPayload(data) as NetworkPayload, todayISO()) }]);
   };
 
   // Support links like /ask?q=... from other pages.
@@ -54,7 +60,7 @@ export default function AskPage() {
 
   return (
     <>
-      <PageHeader title="Ask 6ix" subtitle="Ask about your own network. Answers come only from what you've recorded, worked out on your phone." />
+      <PageHeader title="Ask 6ix" subtitle="Ask about your network, or ask for a draft or a reminder. Answers come only from what you've recorded, worked out on your phone. Nothing is saved or sent without your tap." />
 
       <div className="mx-auto max-w-3xl">
         {turns.length === 0 && (
@@ -110,10 +116,69 @@ export default function AskPage() {
                     {t.a.referencedContactIds.length > 0 && (
                       <div className="mt-4 flex flex-wrap gap-2">
                         {t.a.referencedContactIds.map((id) => (
-                          <span key={id} className="flex items-center gap-1.5 rounded-full bg-white/[0.04] py-1 pl-1 pr-3 text-xs">
-                            <Avatar name={nameOf(id)} size={20} /> {nameOf(id)}
-                          </span>
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setProfile({ id })}
+                            aria-label={`Open ${nameOf(id)}'s profile`}
+                            className="flex min-h-9 items-center gap-1.5 rounded-full bg-white/[0.06] py-1 pl-1 pr-3 text-xs transition hover:bg-white/10"
+                          >
+                            <Avatar name={nameOf(id)} size={22} /> {nameOf(id)}
+                          </button>
                         ))}
+                      </div>
+                    )}
+                    {(t.a.noteIds ?? []).length > 0 && (
+                      <div className="mt-4">
+                        <p className="mb-1.5 text-xs text-silver">Sources</p>
+                        <ul className="space-y-1.5">
+                          {t.a.noteIds!.map((nid) => {
+                            const n = data.interactions.find((x) => x.id === nid);
+                            if (!n) return null;
+                            return (
+                              <li key={nid}>
+                                <button
+                                  type="button"
+                                  onClick={() => setProfile({ id: n.contactId, note: nid })}
+                                  className="flex min-h-11 w-full items-start gap-2 rounded-xl bg-white/[0.03] px-3 py-2 text-left text-xs transition hover:bg-white/[0.06]"
+                                >
+                                  <FileText size={13} className="mt-0.5 shrink-0 text-violet" />
+                                  <span className="min-w-0">
+                                    <span className="text-platinum">
+                                      Your note on {formatDate(n.date)} · {nameOf(n.contactId)}
+                                    </span>
+                                    <span className="block truncate text-silver">{n.summary}</span>
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    )}
+                    {t.a.actions.length > 0 && (
+                      <div className="mt-4 space-y-3 border-t border-white/5 pt-4">
+                        <div className="flex flex-wrap gap-2">
+                          {t.a.actions.map((act, k) =>
+                            act.type === "open" ? (
+                              <Button key={k} size="sm" onClick={() => setProfile({ id: act.contactId })}>
+                                <UserRound size={13} /> Open {nameOf(act.contactId).split(" ")[0]}
+                              </Button>
+                            ) : act.type === "draft" ? (
+                              <Button key={k} size="sm" onClick={() => setDrafting(act)}>
+                                <PenLine size={13} /> {act.contactIds.length > 1 ? "See the introduction draft" : "Draft a message"}
+                              </Button>
+                            ) : null,
+                          )}
+                        </div>
+                        {t.a.actions.map((act, k) =>
+                          act.type === "reminder" ? <ReminderCard
+                              key={k}
+                              action={act}
+                              name={act.contactId ? contactById(act.contactId)?.name : undefined}
+                              collapsed={t.a.actions.length > 1}
+                            /> : null,
+                        )}
                       </div>
                     )}
                     {t.a.gaps.length > 0 && (
@@ -152,6 +217,118 @@ export default function AskPage() {
           </div>
         </form>
       </div>
+
+      <Sheet open={!!profile} onClose={() => setProfile(null)} title="Profile" wide>
+        {profile && <ContactProfile key={profile.id + (profile.note ?? "")} id={profile.id} focusNoteId={profile.note} onDeleted={() => setProfile(null)} />}
+      </Sheet>
+      <Sheet open={!!drafting} onClose={() => setDrafting(null)} title={drafting && drafting.contactIds.length > 1 ? "Introduction draft" : "Message draft"}>
+        {drafting && <DraftPanel key={drafting.draft.body} action={drafting} />}
+      </Sheet>
     </>
+  );
+}
+
+/** A follow-up the person can edit, then save with one tap. Nothing is saved before that tap. */
+function ReminderCard({ action, name, collapsed }: { action: Extract<AskAction, { type: "reminder" }>; name?: string; collapsed?: boolean }) {
+  const { addReminder } = useNetwork();
+  const [open, setOpen] = useState(!collapsed);
+  const [title, setTitle] = useState(action.title);
+  const [due, setDue] = useState(action.dueDate ?? "");
+  const [saved, setSaved] = useState(false);
+  if (saved) {
+    return (
+      <p role="status" className="flex items-center gap-2 rounded-xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <Check size={15} /> Saved{name ? ` to ${name}'s follow-ups` : " as a follow-up"}
+        {due ? `, due ${formatDate(due)}` : ""}.
+      </p>
+    );
+  }
+  if (!open) {
+    return (
+      <Button size="sm" onClick={() => setOpen(true)}>
+        <BellPlus size={13} /> Add a follow-up
+      </Button>
+    );
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-violet/30 bg-violet/5 p-3">
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        <BellPlus size={14} className="text-violet" /> {name ? `Follow-up for ${name}` : "Follow-up"}
+      </p>
+      <input aria-label="Follow-up" className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <input type="date" aria-label="Due date (optional)" className={cn(inputClass, "sm:w-48")} value={due} onChange={(e) => setDue(e.target.value)} />
+        <Button
+          variant="primary"
+          disabled={!title.trim()}
+          onClick={() => {
+            addReminder({ contactId: action.contactId, title: title.trim(), dueDate: due || undefined });
+            setSaved(true);
+          }}
+        >
+          <Check size={14} /> Save follow-up
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/** An editable draft. Copy it, or open it in the phone's email or text app; the person sends it themselves. */
+function DraftPanel({ action }: { action: DraftAction }) {
+  const { contactById } = useNetwork();
+  const [body, setBody] = useState(action.draft.body);
+  const [copied, setCopied] = useState(false);
+  const people = action.contactIds.map((id) => contactById(id)).filter(Boolean);
+  const emails = people.map((c) => c!.email).filter(Boolean) as string[];
+  const phone = people.length === 1 ? people[0]!.phone : undefined;
+  const subject = action.draft.subject;
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-silver">Written from your records. Change anything you like. Nothing is sent from here.</p>
+      {action.draft.basedOn.length > 0 && (
+        <div className="rounded-xl bg-white/[0.03] p-3 text-xs text-silver">
+          <p className="mb-1 font-medium text-platinum">Based on</p>
+          <ul className="list-disc space-y-0.5 pl-4">
+            {action.draft.basedOn.map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div>
+        <Label htmlFor="draft-body">Message</Label>
+        <Textarea id="draft-body" className="min-h-64" value={body} onChange={(e) => setBody(e.target.value)} />
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+        <Button
+          variant="primary"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(body);
+              setCopied(true);
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          <Copy size={14} /> {copied ? "Copied" : "Copy"}
+        </Button>
+        {emails.length > 0 && (
+          <a href={`mailto:${emails.join(",")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`}>
+            <Button className="w-full">
+              <Mail size={14} /> Open in email app
+            </Button>
+          </a>
+        )}
+        {phone && (
+          <a href={`sms:${phone.replace(/[^\d+]/g, "")}?&body=${encodeURIComponent(body)}`}>
+            <Button className="w-full">
+              <MessageSquare size={14} /> Open in messages
+            </Button>
+          </a>
+        )}
+      </div>
+      {emails.length === 0 && !phone && <p className="text-xs text-silver">No email or phone saved for {people.length > 1 ? "them" : people[0]?.name}, so copy the text instead.</p>}
+    </div>
   );
 }

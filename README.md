@@ -15,7 +15,7 @@
 | **The Map** | Interactive map (pinch, drag, tap), category filters, shortest known path with highlighting, "no recorded path" handling | Breadth-first search |
 | **Memory** | Jot down a conversation: who, how, when. If your note names a saved person, they're picked for you. Promises in your wording ("I'll send her my outline by Friday", "she said she'd send me the list next week") are offered as follow-ups, linked to the note, and saved only if you tick them. Search every note, with matches highlighted. Each profile has an "At a glance" summary where every line links to the notes it came from | Plain code (name matching, wording rules) |
 | **Discover** | Possible introductions with the recorded evidence for each, plus a consent-gated introduction template you send yourself | Keyword matching on recorded interests, goals and skills |
-| **Ask 6ix** | Ask about your own network: paths ("How am I connected to James?"), people ("What did I last discuss with Marcus?"), places ("Who do I know in Toronto?") or topics | Rule-based search over your records |
+| **Ask 6ix** | Ask about your own network: paths ("How am I connected to James?"), people ("What did I last discuss with Marcus?"), places ("Who do I know in Toronto?") or topics. People and source notes in each answer are tappable. Ask for actions: "Draft a message to Priya", "Write an intro for Priya and Leo", "Remind me to call Marcus on Friday". Drafts use only saved facts and list them; you copy them or open them in your email or text app. Follow-ups are saved only when you tap Save | Rule-based search and wording rules over your records |
 
 ## Phone app features (Project 2 checklist)
 

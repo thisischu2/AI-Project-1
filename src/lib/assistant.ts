@@ -28,6 +28,8 @@ export interface Answer {
   referencedContactIds: string[];
   gaps: string[];
   paths: PathAnswer[];
+  /** Notes the answer quotes or lists, so they can be shown as sources. */
+  noteIds?: string[];
 }
 
 const list = (items: string[]) =>
@@ -114,7 +116,7 @@ export function answerQuestion(question: string, network: NetworkPayload): Answe
     if (c.goals.length) parts.push(`Recorded goals: ${list(c.goals)}.`);
     if (c.interests.length) parts.push(`Interests: ${list(c.interests)}.`);
     if (!isLastTalkQuestion(question) && c.notes) parts.push(`Your notes: ${c.notes}`);
-    return { answer: parts.join("\n"), referencedContactIds: [c.id], gaps, paths: [] };
+    return { answer: parts.join("\n"), referencedContactIds: [c.id], gaps, paths: [], noteIds: notes.slice(0, 1).map((n) => n.id) };
   }
 
   // 4. A place: match the recorded location field only.
@@ -173,6 +175,7 @@ export function answerQuestion(question: string, network: NetworkPayload): Answe
     ),
     gaps: [],
     paths: [],
+    noteIds: noteHits.map((i) => i.id),
   };
 }
 
@@ -231,7 +234,7 @@ export function draftIntroduction(a: PayloadContact, b: PayloadContact, evidence
   const why = evidence
     .filter((e) => e.kind !== "same_location")
     .map((e) => `• ${e.detail}`)
-    .join("\n");
+    .join("\n") || "• [Add a line on why you thought of them]";
   const sharedDetails = [
     a.occupation && `${a.name}'s occupation`,
     a.organization && `${a.name}'s organization`,

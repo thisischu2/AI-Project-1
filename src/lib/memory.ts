@@ -138,7 +138,8 @@ const TIME_TAIL = new RegExp(
   "i",
 );
 
-function tidy(action: string) {
+/** Clean a follow-up title: drop trailing time words and punctuation, capitalise. */
+export function tidy(action: string) {
   const a = action
     .replace(TIME_TAIL, "")
     .replace(/[.!?,;:\s]+$/, "")
